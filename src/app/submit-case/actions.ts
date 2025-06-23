@@ -3,19 +3,30 @@
 import { detectServiceType } from '@/ai/flows/auto-detect-service-type';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as dbRef, set, serverTimestamp } from 'firebase/database';
+
 
 const FormSchema = z.object({
   patientName: z.string(),
-  dob: z.string(),
+  dob: z.string(), // Keep as string from FormData
   contactPhone: z.string(),
   otherContactPhone: z.string().optional(),
   contactEmail: z.string().email(),
   referringHospital: z.string(),
   serviceType: z.string(),
   hasInsurance: z.preprocess((val) => val === 'true', z.boolean()),
-  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }),
-  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }),
+  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }).refine(file => file.size > 0, 'التقرير الطبي مطلوب.'),
+  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }).refine(file => file.size > 0, 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.'),
 });
+
+async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
+  const fileRef = ref(storage, `cases/${caseId}/${type}-${file.name}`);
+  const snapshot = await uploadBytes(fileRef, file);
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
+}
 
 export async function getServiceTypeAction(ageInMonths: number) {
   try {
@@ -39,11 +50,11 @@ export async function submitCaseAction(formData: FormData) {
   
   const validatedData = FormSchema.safeParse(rawFormData);
   if (!validatedData.success) {
-    console.error("Form validation failed", validatedData.error);
-    throw new Error("Invalid form data");
+    console.error("Form validation failed", validatedData.error.flatten().fieldErrors);
+    throw new Error("Invalid form data. Please check the fields and try again.");
   }
 
-  const { serviceType } = validatedData.data;
+  const { serviceType, medicalReport, identityDocument, ...caseData } = validatedData.data;
 
   const date = new Date();
   const dateString = `${date.getFullYear()}${(date.getMonth() + 1)
@@ -53,8 +64,30 @@ export async function submitCaseAction(formData: FormData) {
 
   const caseId = `${serviceType.toUpperCase()}-${dateString}-${randomNumber}`;
 
-  // Here you would save the data to a database
-  console.log('Case submitted:', { caseId, ...validatedData.data });
+  try {
+    // 1. Upload files to Firebase Storage
+    const medicalReportUrl = await uploadFile(medicalReport, caseId, 'medical-report');
+    const identityDocumentUrl = await uploadFile(identityDocument, caseId, 'identity-document');
+
+    // 2. Save case data to Firebase Realtime Database
+    const caseRef = dbRef(db, `cases/${caseId}`);
+    await set(caseRef, {
+      ...caseData,
+      id: caseId,
+      status: 'Received',
+      submissionDate: serverTimestamp(),
+      serviceType: serviceType,
+      medicalReportUrl,
+      identityDocumentUrl,
+    });
+
+    console.log('Case submitted successfully to Firebase:', caseId);
   
-  redirect(`/submit-case/success?caseId=${caseId}`);
+    redirect(`/submit-case/success?caseId=${caseId}`);
+
+  } catch (error) {
+    console.error("Firebase submission failed:", error);
+    // In a real app, you might want to redirect to an error page or show a toast
+    throw new Error("Failed to submit the case. Please try again later.");
+  }
 }
