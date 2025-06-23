@@ -41,6 +41,7 @@ export default function SubmitCasePage() {
   const [isPending, startTransition] = useTransition();
   const [isDetecting, startDetectingTransition] = useTransition();
   const [serviceTypeInfo, setServiceTypeInfo] = useState<DetectServiceTypeOutput | null>(null);
+  const [age, setAge] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -53,18 +54,55 @@ export default function SubmitCasePage() {
   });
 
   const handleDobChange = (date: Date | undefined) => {
-    if (!date) return;
-    form.setValue('dob', date, { shouldValidate: true });
-    setServiceTypeInfo(null);
+    form.setValue('dob', date as Date, { shouldValidate: true });
+
+    if (!date) {
+      setAge(null);
+      setServiceTypeInfo(null);
+      return;
+    }
+
+    // --- Age calculation for display ---
     const now = new Date();
+    let years = now.getFullYear() - date.getFullYear();
+    let months = now.getMonth() - date.getMonth();
+    let days = now.getDate() - date.getDate();
+
+    if (days < 0) {
+      months--;
+      days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const ageParts: string[] = [];
+    if (years > 0) {
+        ageParts.push(`${years} سنة`);
+        if (months > 0) ageParts.push(`${months} شهر`);
+    } else if (months > 0) {
+        ageParts.push(`${months} شهر`);
+        if (days > 0) ageParts.push(`${days} يوم`);
+    } else if (days >= 0) {
+        ageParts.push(`${days} يوم`);
+    }
+
+    setAge(ageParts.length > 0 ? ageParts.join(' و ') : 'حديث الولادة');
+
+    // --- Age calculation for AI ---
+    setServiceTypeInfo(null);
     let ageInMonths = (now.getFullYear() - date.getFullYear()) * 12;
     ageInMonths -= date.getMonth();
     ageInMonths += now.getMonth();
-    
-    if (ageInMonths <= 0) {
-      ageInMonths = 0; // Handle cases for newborns
+    if (now.getDate() < date.getDate()) {
+      ageInMonths--;
     }
-    
+
+    if (ageInMonths < 0) {
+      ageInMonths = 0;
+    }
+
     startDetectingTransition(async () => {
       const result = await getServiceTypeAction(ageInMonths);
       setServiceTypeInfo(result);
@@ -169,6 +207,18 @@ export default function SubmitCasePage() {
                   )}
                 />
               </div>
+
+              <FormItem>
+                <FormLabel>العمر (محسوب تلقائيًا)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="يُحسب بعد اختيار تاريخ الميلاد"
+                    value={age || ''}
+                    readOnly
+                    className="font-semibold bg-secondary/50 cursor-default"
+                  />
+                </FormControl>
+              </FormItem>
 
               { (isDetecting || serviceTypeInfo) &&
                 <FormItem className="p-4 rounded-lg bg-secondary border border-dashed">
