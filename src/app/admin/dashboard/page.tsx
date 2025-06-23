@@ -15,6 +15,8 @@ import { ClipboardList, FileText, Hospital, RefreshCw, Search, Send, Loader2 } f
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { getCases, type CaseForClient } from './actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
 type CaseType = 'NICU' | 'PICU' | 'ICU';
@@ -44,13 +46,6 @@ interface HospitalData {
   lastUpdated: Date;
 }
 
-const initialCases: Case[] = [
-  { id: 'NICU-20231028-001', patientName: 'عبدالله الرضيع', patientAge: 'شهر واحد', type: 'NICU', status: 'Received', reportUrl: '#', adminNote: '', submissionDate: new Date(Date.now() - 2 * 60 * 60 * 1000) },
-  { id: 'PICU-20231028-002', patientName: 'فاطمة الطفلة', patientAge: '5 سنوات', type: 'PICU', status: 'Reviewed', reportUrl: '#', adminNote: 'تحتاج إلى استشارة متخصصة.', submissionDate: new Date(Date.now() - 5 * 60 * 60 * 1000) },
-  { id: 'ICU-20231027-003', patientName: 'أحمد الشيخ', patientAge: '65 سنة', type: 'ICU', status: 'Admitted', reportUrl: '#', adminNote: 'الحالة مستقرة في مستشفى الأمل.', submissionDate: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-  { id: 'NICU-20231026-004', patientName: 'سارة الصغيرة', patientAge: 'أسبوعين', type: 'NICU', status: 'Reviewed', reportUrl: '#', adminNote: 'مستقرة ولكن تحتاج إلى مراقبة.', submissionDate: new Date(Date.now() - 48 * 60 * 60 * 1000) },
-];
-
 const initialHospitals: HospitalData[] = [
   { id: 'hosp1', name: 'مستشفى الملك فهد', beds: { nicu: 3, picu: 0, icu: 1 }, lastUpdated: new Date() },
   { id: 'hosp2', name: 'مستشفى النور التخصصي', beds: { nicu: 5, picu: 2, icu: 8 }, lastUpdated: new Date(Date.now() - 10 * 60 * 1000) },
@@ -58,7 +53,8 @@ const initialHospitals: HospitalData[] = [
 ];
 
 export default function AdminDashboardPage() {
-  const [cases, setCases] = useState<Case[]>(initialCases);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [isLoadingCases, setIsLoadingCases] = useState(true);
   const [hospitals, setHospitals] = useState<HospitalData[]>(initialHospitals);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -67,14 +63,39 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
+  const fetchCases = async () => {
+    setIsLoadingCases(true);
+    try {
+        const fetchedCases = await getCases();
+        const processedCases: Case[] = fetchedCases.map(c => ({
+            ...c,
+            submissionDate: new Date(c.submissionDate),
+            assignedAt: c.assignedAt ? new Date(c.assignedAt) : undefined,
+        }));
+        setCases(processedCases);
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'فشل في تحميل الحالات',
+            description: 'حدث خطأ أثناء جلب البيانات من قاعدة البيانات.',
+        });
+    } finally {
+        setIsLoadingCases(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCases();
+  }, []);
+
   const handleRefresh = () => {
     setIsRefreshing(true);
+    fetchCases();
     setTimeout(() => {
-      // In a real app, this would be an API call
       setHospitals(prev => prev.map(h => ({ ...h, lastUpdated: new Date() })));
       setLastRefreshed(new Date());
       setIsRefreshing(false);
-      toast({ title: 'تم تحديث بيانات المستشفيات' });
+      toast({ title: 'تم تحديث البيانات' });
     }, 500);
   };
   
@@ -95,10 +116,12 @@ export default function AdminDashboardPage() {
   }, [cases, typeFilter, statusFilter, searchQuery]);
 
   const updateCase = (caseId: string, updates: Partial<Case>) => {
+    // TODO: This should update Firestore. For now, it only updates local state.
     setCases(prevCases => prevCases.map(c => c.id === caseId ? { ...c, ...updates } : c));
   };
 
   const handleAssign = (caseId: string, hospitalId: string) => {
+    // TODO: This should update Firestore. For now, it only updates local state.
     const hospital = hospitals.find(h => h.id === hospitalId);
     if (hospital) {
         updateCase(caseId, { 
@@ -184,61 +207,81 @@ export default function AdminDashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {filteredCases.map((c) => (
-                    <Card key={c.id} className="flex flex-col">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <CardTitle className="text-lg">{c.patientName} <span className="text-sm font-normal text-muted-foreground">({c.patientAge})</span></CardTitle>
-                                <Badge className={getBadgeColor(c.type)}>{c.type}</Badge>
-                            </div>
-                            <CardDescription>{c.id}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4 flex-1">
-                             <div>
-                                <Label>الحالة</Label>
-                                <Select value={c.status} onValueChange={(newStatus) => updateCase(c.id, { status: newStatus as CaseStatus })}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.entries(statusMap).map(([key, value]) => (
-                                            <SelectItem key={key} value={key}>{value.text}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label htmlFor={`note-${c.id}`}>ملاحظات إدارية</Label>
-                                <Textarea id={`note-${c.id}`} placeholder="إضافة ملاحظة..." value={c.adminNote} onChange={(e) => updateCase(c.id, { adminNote: e.target.value })} />
-                            </div>
-                            {c.reportUrl && <Button variant="secondary" className="w-full"><FileText className="me-2"/> عرض التقرير الطبي</Button>}
-                        </CardContent>
-                        <CardFooter className="flex flex-col items-start gap-4">
-                            {c.status !== 'Assigned' ? (
-                                <div className='w-full space-y-2'>
-                                    <Label>تعيين إلى مستشفى</Label>
-                                    <div className="flex w-full gap-2">
-                                        <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="اختر مستشفى..."/>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {hospitals.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-sm text-muted-foreground w-full p-2 bg-secondary rounded-md">
-                                    <p><span className='font-semibold'>تم التعيين إلى:</span> {c.assignedTo}</p>
-                                    <p><span className='font-semibold'>بواسطة:</span> {c.assignedBy}</p>
-                                    <p><span className='font-semibold'>في:</span> {c.assignedAt?.toLocaleString('ar-EG')}</p>
-                                </div>
-                            )}
-                        </CardFooter>
+                {isLoadingCases ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Card key={index}>
+                      <CardHeader>
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                      </CardContent>
+                      <CardFooter>
+                        <Skeleton className="h-10 w-full" />
+                      </CardFooter>
                     </Card>
-                ))}
-                {filteredCases.length === 0 && <p className="text-muted-foreground col-span-full text-center py-8">لا توجد حالات تطابق معايير البحث.</p>}
+                  ))
+                ) : filteredCases.length > 0 ? (
+                    filteredCases.map((c) => (
+                      <Card key={c.id} className="flex flex-col">
+                          <CardHeader>
+                              <div className="flex justify-between items-start">
+                                  <CardTitle className="text-lg">{c.patientName} <span className="text-sm font-normal text-muted-foreground">({c.patientAge})</span></CardTitle>
+                                  <Badge className={getBadgeColor(c.type)}>{c.type}</Badge>
+                              </div>
+                              <CardDescription>{c.id}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4 flex-1">
+                              <div>
+                                  <Label>الحالة</Label>
+                                  <Select value={c.status} onValueChange={(newStatus) => updateCase(c.id, { status: newStatus as CaseStatus })}>
+                                      <SelectTrigger>
+                                          <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                          {Object.entries(statusMap).map(([key, value]) => (
+                                              <SelectItem key={key} value={key}>{value.text}</SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                  </Select>
+                              </div>
+                              <div>
+                                  <Label htmlFor={`note-${c.id}`}>ملاحظات إدارية</Label>
+                                  <Textarea id={`note-${c.id}`} placeholder="إضافة ملاحظة..." value={c.adminNote} onChange={(e) => updateCase(c.id, { adminNote: e.target.value })} />
+                              </div>
+                              {c.reportUrl && <Button asChild variant="secondary" className="w-full"><a href={c.reportUrl} target="_blank" rel="noopener noreferrer"><FileText className="me-2"/> عرض التقرير الطبي</a></Button>}
+                          </CardContent>
+                          <CardFooter className="flex flex-col items-start gap-4">
+                              {c.status !== 'Assigned' ? (
+                                  <div className='w-full space-y-2'>
+                                      <Label>تعيين إلى مستشفى</Label>
+                                      <div className="flex w-full gap-2">
+                                          <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)}>
+                                              <SelectTrigger>
+                                                  <SelectValue placeholder="اختر مستشفى..."/>
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                  {hospitals.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                                              </SelectContent>
+                                          </Select>
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <div className="text-sm text-muted-foreground w-full p-2 bg-secondary rounded-md">
+                                      <p><span className='font-semibold'>تم التعيين إلى:</span> {c.assignedTo}</p>
+                                      <p><span className='font-semibold'>بواسطة:</span> {c.assignedBy}</p>
+                                      <p><span className='font-semibold'>في:</span> {c.assignedAt?.toLocaleString('ar-EG')}</p>
+                                  </div>
+                              )}
+                          </CardFooter>
+                      </Card>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground col-span-full text-center py-8">لا توجد حالات تطابق معايير البحث الحالية.</p>
+                )}
             </CardContent>
           </Card>
         </TabsContent>
