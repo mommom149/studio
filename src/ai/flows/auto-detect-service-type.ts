@@ -39,8 +39,8 @@ const prompt = ai.definePrompt({
 
 Here are the age ranges for each service type:
 - NICU: < 1 month
-- PICU: 1 month - 18 years
-- ICU: > 18 years
+- PICU: 1 month - 18 years (216 months)
+- ICU: > 18 years (216 months)
 
 Age: {{{ageInMonths}}} months
 

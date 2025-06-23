@@ -19,20 +19,22 @@ export async function getServiceTypeAction(ageInMonths: number) {
     return result;
   } catch (error) {
     console.error('AI service detection failed:', error);
-    return {
-      serviceType: 'ICU',
-      justification: 'تعذر التحديد التلقائي، تم التعيين إلى ICU افتراضيًا.',
-    };
+    // Fallback in case of AI error
+    if (ageInMonths < 1) {
+      return { serviceType: 'NICU', justification: 'تم التعيين إلى NICU بناءً على العمر (أقل من شهر).' };
+    } else if (ageInMonths <= 18 * 12) {
+      return { serviceType: 'PICU', justification: 'تم التعيين إلى PICU بناءً على العمر (بين شهر و 18 عامًا).' };
+    } else {
+      return { serviceType: 'ICU', justification: 'تم التعيين إلى ICU بناءً على العمر (أكبر من 18 عامًا).' };
+    }
   }
 }
 
 export async function submitCaseAction(formData: FormData) {
   const rawFormData = Object.fromEntries(formData.entries());
   
-  // Quick validation, more robust validation should be here
   const validatedData = FormSchema.safeParse(rawFormData);
   if (!validatedData.success) {
-    // Handle error - in a real app, you'd return this to the form
     console.error("Form validation failed", validatedData.error);
     throw new Error("Invalid form data");
   }

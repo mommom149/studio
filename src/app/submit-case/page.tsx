@@ -54,9 +54,16 @@ export default function SubmitCasePage() {
 
   const handleDobChange = (date: Date | undefined) => {
     if (!date) return;
-    form.setValue('dob', date);
+    form.setValue('dob', date, { shouldValidate: true });
+    setServiceTypeInfo(null);
     const now = new Date();
-    const ageInMonths = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth());
+    let ageInMonths = (now.getFullYear() - date.getFullYear()) * 12;
+    ageInMonths -= date.getMonth();
+    ageInMonths += now.getMonth();
+    
+    if (ageInMonths <= 0) {
+      ageInMonths = 0; // Handle cases for newborns
+    }
     
     startDetectingTransition(async () => {
       const result = await getServiceTypeAction(ageInMonths);
@@ -80,13 +87,19 @@ export default function SubmitCasePage() {
         if (value) {
             if (key === 'dob' && value instanceof Date) {
                  formData.append(key, value.toISOString());
-            } else {
+            } else if (key === 'medicalReport' && value instanceof File) {
+                 formData.append(key, value);
+            } else if (typeof value === 'string') {
                  formData.append(key, value);
             }
         }
       });
       if (serviceTypeInfo?.serviceType) {
         formData.append('serviceType', serviceTypeInfo.serviceType);
+      } else {
+        // Handle case where AI detection hasn't completed or failed.
+        // For now, we'll just prevent submission. A better UX would show an error.
+        return;
       }
       await submitCaseAction(formData);
     });
@@ -160,7 +173,7 @@ export default function SubmitCasePage() {
               { (isDetecting || serviceTypeInfo) &&
                 <FormItem className="p-4 rounded-lg bg-secondary border border-dashed">
                   <FormLabel className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-accent" />
+                    <Sparkles className="h-4 w-4 text-violet-400" />
                     نوع الخدمة (محدد تلقائيًا)
                   </FormLabel>
                   {isDetecting ? (
@@ -223,12 +236,13 @@ export default function SubmitCasePage() {
               <FormField
                 control={form.control}
                 name="medicalReport"
-                render={({ field }) => (
+                render={({ field: { onChange, value, ...rest }}) => (
                   <FormItem>
                     <FormLabel>تحميل تقرير طبي (اختياري)</FormLabel>
                     <FormControl>
                       <Input type="file" accept="image/*,application/pdf" className="pt-2"
-                        onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
+                        {...rest}
+                        onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
                       />
                     </FormControl>
                     <FormDescription>يمكنك تحميل صور أو ملفات PDF.</FormDescription>
