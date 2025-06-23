@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ref as dbRef, set, serverTimestamp } from 'firebase/database';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
 const FormSchema = z.object({
@@ -69,9 +69,9 @@ export async function submitCaseAction(formData: FormData) {
     const medicalReportUrl = await uploadFile(medicalReport, caseId, 'medical-report');
     const identityDocumentUrl = await uploadFile(identityDocument, caseId, 'identity-document');
 
-    // 2. Save case data to Firebase Realtime Database
-    const caseRef = dbRef(db, `cases/${caseId}`);
-    await set(caseRef, {
+    // 2. Save case data to Cloud Firestore
+    const caseRef = doc(db, 'cases', caseId);
+    await setDoc(caseRef, {
       ...caseData,
       id: caseId,
       status: 'Received',
