@@ -3,14 +3,14 @@
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
 
-// Shape of data from Firestore
+// Shape of data from Firestore, with fields marked as optional to reflect real-world data
 interface CaseFromFirestore {
-  patientName: string;
-  dob: string; // ISO string
-  serviceType: 'NICU' | 'PICU' | 'ICU';
-  status: 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
-  medicalReportUrl: string;
-  submissionDate: Timestamp;
+  patientName?: string;
+  dob?: string; // ISO string
+  serviceType?: 'NICU' | 'PICU' | 'ICU';
+  status?: 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
+  medicalReportUrl?: string;
+  submissionDate?: Timestamp;
   adminNote?: string;
   assignedTo?: string;
   assignedBy?: string;
@@ -35,6 +35,9 @@ export interface CaseForClient {
 
 function calculateAge(dob: string): string {
     const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) {
+      return 'عمر غير معروف';
+    }
     const now = new Date();
     let years = now.getFullYear() - birthDate.getFullYear();
     let months = now.getMonth() - birthDate.getMonth();
@@ -77,9 +80,13 @@ export async function getCases(): Promise<CaseForClient[]> {
     const cases: CaseForClient[] = querySnapshot.docs.map(doc => {
       const data = doc.data() as CaseFromFirestore;
 
-      // Guard against documents missing the submissionDate
+      // Guard against documents missing critical data
       if (!data.submissionDate || typeof data.submissionDate.toDate !== 'function') {
         console.warn(`Document ${doc.id} is missing a valid submissionDate. Skipping.`);
+        return null;
+      }
+      if (!data.patientName || !data.dob || !data.serviceType) {
+        console.warn(`Document ${doc.id} is missing critical data (patientName, dob, or serviceType). Skipping.`);
         return null;
       }
       
