@@ -12,15 +12,13 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { Shield, Hospital, Home, Stethoscope, FileSearch } from 'lucide-react';
+import { Shield, Hospital, Home } from 'lucide-react';
 
 export function AppSidebar() {
   const pathname = usePathname();
 
   const menuItems = [
     { href: '/', label: 'الرئيسية', icon: Home },
-    { href: '/submit-case', label: 'إرسال حالة جديدة', icon: Stethoscope },
-    { href: '/case-status', label: 'عرض حالة الطلب', icon: FileSearch },
   ];
 
   const secondaryMenuItems = [
