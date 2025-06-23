@@ -20,11 +20,11 @@ export default function HospitalLoginPage() {
         <CardContent>
           <form className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني أو معرف المستشفى</Label>
+              <Label htmlFor="hospital-id">معرف المستشفى</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="email@example.com"
+                id="hospital-id"
+                type="text"
+                placeholder="أدخل معرف المستشفى"
                 required
               />
             </div>
