@@ -69,7 +69,7 @@ export async function submitCaseAction(formData: FormData) {
     const medicalReportUrl = await uploadFile(medicalReport, caseId, 'medical-report');
     const identityDocumentUrl = await uploadFile(identityDocument, caseId, 'identity-document');
 
-    // 2. Save case data to Cloud Firestore
+    // 2. Save case data to Cloud Firestore in the 'cases' collection
     const caseRef = doc(db, 'cases', caseId);
     await setDoc(caseRef, {
       ...caseData,
