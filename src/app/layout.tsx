@@ -3,6 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { Header } from '@/components/header';
 import { OfflineIndicator } from '@/components/offline-indicator';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/app-sidebar';
 
 export const metadata: Metadata = {
   title: 'NeoBridge | نيوبريدج',
@@ -24,11 +26,14 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased min-h-screen bg-background flex flex-col">
-        <Header />
-        <main className="flex-1 flex flex-col">
-          {children}
-        </main>
+      <body className="font-body antialiased bg-background">
+        <SidebarProvider>
+          <AppSidebar />
+          <div className="flex flex-col flex-1 min-w-0">
+            <Header />
+            <main className="flex-1 flex flex-col">{children}</main>
+          </div>
+        </SidebarProvider>
         <Toaster />
         <OfflineIndicator />
       </body>
