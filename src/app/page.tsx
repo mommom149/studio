@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 bg-background">
       <div className="w-full max-w-2xl text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-violet-400 to-green-300 mb-4">
+        <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-emerald-400 mb-4">
           أهلاً بكم في نيوبريدج
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground mb-10">
