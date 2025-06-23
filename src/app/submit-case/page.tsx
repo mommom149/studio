@@ -31,6 +31,7 @@ const formSchema = z.object({
   patientName: z.string().min(2, { message: 'الاسم مطلوب.' }),
   dob: z.date({ required_error: 'تاريخ الميلاد مطلوب.' }),
   contactPhone: z.string().min(8, { message: 'رقم هاتف صحيح مطلوب.' }),
+  otherContactPhone: z.string().optional(),
   contactEmail: z.string().email({ message: 'بريد إلكتروني صحيح مطلوب.' }),
   referringHospital: z.string().min(3, { message: 'اسم المستشفى أو الطبيب مطلوب.' }),
   hasInsurance: z.boolean().default(false),
@@ -51,6 +52,7 @@ export default function SubmitCasePage() {
     defaultValues: {
       patientName: '',
       contactPhone: '',
+      otherContactPhone: '',
       contactEmail: '',
       referringHospital: '',
       hasInsurance: false,
@@ -259,20 +261,34 @@ export default function SubmitCasePage() {
                     </FormItem>
                   )}
                 />
-                <FormField
+                 <FormField
                   control={form.control}
-                  name="contactEmail"
+                  name="otherContactPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>البريد الإلكتروني لجهة الاتصال</FormLabel>
+                      <FormLabel>هاتف جهة اتصال اخر (اختياري)</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="البريد الإلكتروني" {...field} />
+                        <Input type="tel" placeholder="رقم هاتف إضافي" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              
+              <FormField
+                control={form.control}
+                name="contactEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>البريد الإلكتروني لجهة الاتصال</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="البريد الإلكتروني" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

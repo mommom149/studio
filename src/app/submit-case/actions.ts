@@ -8,6 +8,7 @@ const FormSchema = z.object({
   patientName: z.string(),
   dob: z.string(),
   contactPhone: z.string(),
+  otherContactPhone: z.string().optional(),
   contactEmail: z.string().email(),
   referringHospital: z.string(),
   serviceType: z.string(),
