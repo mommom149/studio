@@ -5,7 +5,6 @@ import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firesto
 
 // Shape of data from Firestore
 interface CaseFromFirestore {
-  id: string;
   patientName: string;
   dob: string; // ISO string
   serviceType: 'NICU' | 'PICU' | 'ICU';
@@ -77,8 +76,15 @@ export async function getCases(): Promise<CaseForClient[]> {
 
     const cases: CaseForClient[] = querySnapshot.docs.map(doc => {
       const data = doc.data() as CaseFromFirestore;
+
+      // Guard against documents missing the submissionDate
+      if (!data.submissionDate || typeof data.submissionDate.toDate !== 'function') {
+        console.warn(`Document ${doc.id} is missing a valid submissionDate. Skipping.`);
+        return null;
+      }
+      
       return {
-        id: data.id,
+        id: doc.id,
         patientName: data.patientName,
         patientAge: calculateAge(data.dob),
         type: data.serviceType,
@@ -90,11 +96,12 @@ export async function getCases(): Promise<CaseForClient[]> {
         assignedBy: data.assignedBy,
         assignedAt: data.assignedAt ? data.assignedAt.toDate().toISOString() : undefined,
       };
-    });
+    }).filter((c): c is CaseForClient => c !== null); // Filter out any null entries
 
     return cases;
   } catch (error) {
     console.error("Error fetching cases from Firestore:", error);
+    // Return empty array on error to prevent crashing the client
     return [];
   }
 }
