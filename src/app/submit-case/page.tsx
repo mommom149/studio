@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,6 +27,16 @@ import { useState, useTransition } from 'react';
 import type { DetectServiceTypeOutput } from '@/ai/flows/auto-detect-service-type';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const formSchema = z.object({
   patientName: z.string().min(2, { message: 'الاسم مطلوب.' }),
@@ -46,6 +57,8 @@ export default function SubmitCasePage() {
   const [isDetecting, startDetectingTransition] = useTransition();
   const [serviceTypeInfo, setServiceTypeInfo] = useState<DetectServiceTypeOutput | null>(null);
   const [age, setAge] = useState<string | null>(null);
+  const [isConsentDialogOpen, setIsConsentDialogOpen] = useState(true);
+  const [isConsentAgreed, setIsConsentAgreed] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -58,6 +71,12 @@ export default function SubmitCasePage() {
       hasInsurance: false,
     },
   });
+
+  const handleConsentAndContinue = () => {
+    if (isConsentAgreed) {
+      setIsConsentDialogOpen(false);
+    }
+  };
 
   const handleDobChange = (date: Date | undefined) => {
     form.setValue('dob', date as Date, { shouldValidate: true });
@@ -151,234 +170,264 @@ export default function SubmitCasePage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-2xl mx-auto border-green-500/30 shadow-green-500/10 shadow-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-green-500/10 rounded-full p-3 w-fit mb-2">
-            <Stethoscope className="h-8 w-8 text-green-400" />
+    <>
+      <AlertDialog open={isConsentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>إقرار بالموافقة على استخدام وتداول البيانات</AlertDialogTitle>
+            <AlertDialogDescription>
+              برجاء قراءة الإقرار التالي بعناية قبل متابعة إدخال البيانات:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 text-sm bg-secondary p-4 rounded-md text-secondary-foreground border">
+            "أقر أنا المستخدم بأنني أوافق على قيام تطبيق NeoBridge بجمع، استخدام، وتداول البيانات التي أقوم بتقديمها، وذلك لأغراض تنظيم وتحسين خدمات الرعاية الصحية، مع الالتزام التام بالحفاظ على سرية وخصوصية هذه البيانات وعدم مشاركتها مع أي جهة غير مصرح لها بذلك، إلا في إطار ما تقتضيه الضرورة الطبية أو القانونية."
           </div>
-          <CardTitle className="text-2xl">إرسال حالة جديدة</CardTitle>
-          <CardDescription>املأ النموذج أدناه لتقديم طلب إحالة جديد.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="patientName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>اسم المريض</FormLabel>
-                      <FormControl>
-                        <Input placeholder="الاسم الكامل" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dob"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>تاريخ الميلاد</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={'outline'}
-                              className={cn(
-                                'w-full justify-start text-right font-normal',
-                                !field.value && 'text-muted-foreground'
-                              )}
-                            >
-                              <CalendarIcon className="ms-auto me-2 h-4 w-4" />
-                              {field.value ? format(field.value, 'PPP', { locale: ar }) : <span>اختر تاريخًا</span>}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={handleDobChange}
-                            disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                            initialFocus
-                            locale={ar}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormItem>
-                <FormLabel>العمر (محسوب تلقائيًا)</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="يُحسب بعد اختيار تاريخ الميلاد"
-                    value={age || ''}
-                    readOnly
-                    className="font-semibold bg-secondary/50 cursor-default"
+          <div className="flex items-center gap-2 pt-2">
+            <Checkbox id="terms" checked={isConsentAgreed} onCheckedChange={(checked) => setIsConsentAgreed(checked as boolean)} />
+            <label
+              htmlFor="terms"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              أتعهد بأنني قرأت هذا الإقرار وأوافق على ما ورد فيه.
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleConsentAndContinue} disabled={!isConsentAgreed}>
+              متابعة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-2xl mx-auto border-green-500/30 shadow-green-500/10 shadow-lg">
+          <CardHeader className="text-center">
+            <div className="mx-auto bg-green-500/10 rounded-full p-3 w-fit mb-2">
+              <Stethoscope className="h-8 w-8 text-green-400" />
+            </div>
+            <CardTitle className="text-2xl">إرسال حالة جديدة</CardTitle>
+            <CardDescription>املأ النموذج أدناه لتقديم طلب إحالة جديد.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="patientName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>اسم المريض</FormLabel>
+                        <FormControl>
+                          <Input placeholder="الاسم الكامل" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </FormControl>
-              </FormItem>
+                  <FormField
+                    control={form.control}
+                    name="dob"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>تاريخ الميلاد</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={'outline'}
+                                className={cn(
+                                  'w-full justify-start text-right font-normal',
+                                  !field.value && 'text-muted-foreground'
+                                )}
+                              >
+                                <CalendarIcon className="ms-auto me-2 h-4 w-4" />
+                                {field.value ? format(field.value, 'PPP', { locale: ar }) : <span>اختر تاريخًا</span>}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={handleDobChange}
+                              disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                              initialFocus
+                              locale={ar}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              { (isDetecting || serviceTypeInfo) &&
-                <FormItem className="p-4 rounded-lg bg-secondary border border-dashed">
-                  <FormLabel className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-violet-400" />
-                    نوع الخدمة (محدد تلقائيًا)
-                  </FormLabel>
-                  {isDetecting ? (
-                     <div className='flex items-center gap-2 text-muted-foreground'>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>جاري تحديد نوع الخدمة...</span>
-                     </div>
-                  ) : serviceTypeInfo && (
-                     <div>
-                        <Badge className={getBadgeColor(serviceTypeInfo.serviceType)}>{serviceTypeInfo.serviceType}</Badge>
-                        <FormDescription className="mt-2">{serviceTypeInfo.justification}</FormDescription>
-                     </div>
-                  )}
-                </FormItem>
-              }
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <FormField
-                  control={form.control}
-                  name="contactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>هاتف جهة الاتصال</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="رقم الهاتف" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="otherContactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>هاتف جهة اتصال اخر (اختياري)</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="رقم هاتف إضافي" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="contactEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>البريد الإلكتروني لجهة الاتصال</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="البريد الإلكتروني" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="referringHospital"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>المستشفى / الطبيب المُحيل</FormLabel>
-                    <FormControl>
-                      <Input placeholder="اسم المستشفى أو الطبيب" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="hasInsurance"
-                render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                    <FormLabel>له تأمين صحي</FormLabel>
-                    <FormDescription>
-                        حدد ما إذا كان المريض لديه تأمين صحي.
-                    </FormDescription>
-                    </div>
-                    <FormControl>
-                    <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                <FormItem>
+                  <FormLabel>العمر (محسوب تلقائيًا)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="يُحسب بعد اختيار تاريخ الميلاد"
+                      value={age || ''}
+                      readOnly
+                      className="font-semibold bg-secondary/50 cursor-default"
                     />
-                    </FormControl>
+                  </FormControl>
                 </FormItem>
-                )}
-              />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                { (isDetecting || serviceTypeInfo) &&
+                  <FormItem className="p-4 rounded-lg bg-secondary border border-dashed">
+                    <FormLabel className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-violet-400" />
+                      نوع الخدمة (محدد تلقائيًا)
+                    </FormLabel>
+                    {isDetecting ? (
+                       <div className='flex items-center gap-2 text-muted-foreground'>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>جاري تحديد نوع الخدمة...</span>
+                       </div>
+                    ) : serviceTypeInfo && (
+                       <div>
+                          <Badge className={getBadgeColor(serviceTypeInfo.serviceType)}>{serviceTypeInfo.serviceType}</Badge>
+                          <FormDescription className="mt-2">{serviceTypeInfo.justification}</FormDescription>
+                       </div>
+                    )}
+                  </FormItem>
+                }
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <FormField
+                    control={form.control}
+                    name="contactPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>هاتف جهة الاتصال</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="رقم الهاتف" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="otherContactPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>هاتف جهة اتصال اخر (اختياري)</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="رقم هاتف إضافي" {...field} value={field.value ?? ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
                 <FormField
                   control={form.control}
-                  name="medicalReport"
-                  render={({ field: { onChange, value, ...rest }}) => (
+                  name="contactEmail"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>تحميل تقرير طبي</FormLabel>
+                      <FormLabel>البريد الإلكتروني لجهة الاتصال</FormLabel>
                       <FormControl>
-                        <Input type="file" accept="image/*,application/pdf" className="pt-2"
-                          {...rest}
-                          onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
-                        />
+                        <Input type="email" placeholder="البريد الإلكتروني" {...field} />
                       </FormControl>
-                      <FormDescription>التقرير الطبي إلزامي.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="identityDocument"
-                  render={({ field: { onChange, value, ...rest }}) => (
-                    <FormItem>
-                      <FormLabel>تحميل شهادة ميلاد او البطاقة شخصية</FormLabel>
-                      <FormControl>
-                        <Input type="file" accept="image/*,application/pdf" className="pt-2"
-                          {...rest}
-                          onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
-                        />
-                      </FormControl>
-                      <FormDescription>شهادة الميلاد أو البطاقة الشخصية إلزامية.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
 
-              <Button type="submit" className="w-full h-12 text-lg" disabled={isPending || isDetecting || !serviceTypeInfo}>
-                {isPending ? (
-                  <>
-                    <Loader2 className="me-2 h-5 w-5 animate-spin" />
-                    جاري الإرسال...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="me-2 h-5 w-5" />
-                    إرسال الحالة
-                  </>
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+                <FormField
+                  control={form.control}
+                  name="referringHospital"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>المستشفى / الطبيب المُحيل</FormLabel>
+                      <FormControl>
+                        <Input placeholder="اسم المستشفى أو الطبيب" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="hasInsurance"
+                  render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                      <FormLabel>له تأمين صحي</FormLabel>
+                      <FormDescription>
+                          حدد ما إذا كان المريض لديه تأمين صحي.
+                      </FormDescription>
+                      </div>
+                      <FormControl>
+                      <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                      />
+                      </FormControl>
+                  </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="medicalReport"
+                    render={({ field: { onChange, value, ...rest }}) => (
+                      <FormItem>
+                        <FormLabel>تحميل تقرير طبي</FormLabel>
+                        <FormControl>
+                          <Input type="file" accept="image/*,application/pdf" className="pt-2"
+                            {...rest}
+                            onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+                          />
+                        </FormControl>
+                        <FormDescription>التقرير الطبي إلزامي.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="identityDocument"
+                    render={({ field: { onChange, value, ...rest }}) => (
+                      <FormItem>
+                        <FormLabel>تحميل شهادة ميلاد او البطاقة شخصية</FormLabel>
+                        <FormControl>
+                          <Input type="file" accept="image/*,application/pdf" className="pt-2"
+                            {...rest}
+                            onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+                          />
+                        </FormControl>
+                        <FormDescription>شهادة الميلاد أو البطاقة الشخصية إلزامية.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Button type="submit" className="w-full h-12 text-lg" disabled={isPending || isDetecting || !serviceTypeInfo}>
+                  {isPending ? (
+                    <>
+                      <Loader2 className="me-2 h-5 w-5 animate-spin" />
+                      جاري الإرسال...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="me-2 h-5 w-5" />
+                      إرسال الحالة
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }
+
