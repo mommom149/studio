@@ -32,7 +32,8 @@ const formSchema = z.object({
   contactPhone: z.string().min(8, { message: 'رقم هاتف صحيح مطلوب.' }),
   contactEmail: z.string().email({ message: 'بريد إلكتروني صحيح مطلوب.' }),
   referringHospital: z.string().min(3, { message: 'اسم المستشفى أو الطبيب مطلوب.' }),
-  medicalReport: z.instanceof(File).optional(),
+  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }),
+  birthCertificate: z.instanceof(File, { message: 'شهادة الميلاد مطلوبة.' }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -123,9 +124,9 @@ export default function SubmitCasePage() {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
         if (value) {
-            if (key === 'dob' && value instanceof Date) {
+            if (value instanceof Date) {
                  formData.append(key, value.toISOString());
-            } else if (key === 'medicalReport' && value instanceof File) {
+            } else if (value instanceof File) {
                  formData.append(key, value);
             } else if (typeof value === 'string') {
                  formData.append(key, value);
@@ -283,23 +284,42 @@ export default function SubmitCasePage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="medicalReport"
-                render={({ field: { onChange, value, ...rest }}) => (
-                  <FormItem>
-                    <FormLabel>تحميل تقرير طبي (اختياري)</FormLabel>
-                    <FormControl>
-                      <Input type="file" accept="image/*,application/pdf" className="pt-2"
-                        {...rest}
-                        onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
-                      />
-                    </FormControl>
-                    <FormDescription>يمكنك تحميل صور أو ملفات PDF.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="medicalReport"
+                  render={({ field: { onChange, value, ...rest }}) => (
+                    <FormItem>
+                      <FormLabel>تحميل تقرير طبي</FormLabel>
+                      <FormControl>
+                        <Input type="file" accept="image/*,application/pdf" className="pt-2"
+                          {...rest}
+                          onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+                        />
+                      </FormControl>
+                      <FormDescription>التقرير الطبي إلزامي.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="birthCertificate"
+                  render={({ field: { onChange, value, ...rest }}) => (
+                    <FormItem>
+                      <FormLabel>تحميل شهادة ميلاد</FormLabel>
+                      <FormControl>
+                        <Input type="file" accept="image/*,application/pdf" className="pt-2"
+                          {...rest}
+                          onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
+                        />
+                      </FormControl>
+                      <FormDescription>شهادة الميلاد إلزامية.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <Button type="submit" className="w-full h-12 text-lg" disabled={isPending || isDetecting || !serviceTypeInfo}>
                 {isPending ? (
