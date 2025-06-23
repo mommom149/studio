@@ -5,19 +5,14 @@ import { Bell } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Logo } from '@/components/logo';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="z-10 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center">
-        <div className="flex items-center gap-2 mr-6">
-          <SidebarTrigger className="md:hidden" />
-          <Link href="/" className="flex items-center gap-2 md:hidden">
-            <Logo className="h-6 w-6 text-green-400" />
-            <span className="font-bold text-lg">نيوبريدج</span>
-          </Link>
+        <div className="flex items-center gap-2">
+          <SidebarTrigger />
         </div>
         <div className="flex flex-1 items-center justify-end space-x-2">
           <nav className="flex items-center">

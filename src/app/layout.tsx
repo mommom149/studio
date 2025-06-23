@@ -28,10 +28,12 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background">
         <SidebarProvider>
-          <AppSidebar />
-          <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex flex-col h-screen">
             <Header />
-            <main className="flex-1 flex flex-col">{children}</main>
+            <div className="flex flex-1 overflow-hidden">
+              <AppSidebar />
+              <main className="flex-1 overflow-y-auto">{children}</main>
+            </div>
           </div>
         </SidebarProvider>
         <Toaster />
