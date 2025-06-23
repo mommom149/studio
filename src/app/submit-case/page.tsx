@@ -25,6 +25,7 @@ import { getServiceTypeAction, submitCaseAction } from './actions';
 import { useState, useTransition } from 'react';
 import type { DetectServiceTypeOutput } from '@/ai/flows/auto-detect-service-type';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 const formSchema = z.object({
   patientName: z.string().min(2, { message: 'الاسم مطلوب.' }),
@@ -32,8 +33,9 @@ const formSchema = z.object({
   contactPhone: z.string().min(8, { message: 'رقم هاتف صحيح مطلوب.' }),
   contactEmail: z.string().email({ message: 'بريد إلكتروني صحيح مطلوب.' }),
   referringHospital: z.string().min(3, { message: 'اسم المستشفى أو الطبيب مطلوب.' }),
+  hasInsurance: z.boolean().default(false),
   medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }),
-  birthCertificate: z.instanceof(File, { message: 'شهادة الميلاد مطلوبة.' }),
+  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -51,6 +53,7 @@ export default function SubmitCasePage() {
       contactPhone: '',
       contactEmail: '',
       referringHospital: '',
+      hasInsurance: false,
     },
   });
 
@@ -123,14 +126,15 @@ export default function SubmitCasePage() {
     startTransition(async () => {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
-        if (value) {
-            if (value instanceof Date) {
-                 formData.append(key, value.toISOString());
-            } else if (value instanceof File) {
-                 formData.append(key, value);
-            } else if (typeof value === 'string') {
-                 formData.append(key, value);
-            }
+        if (value !== null && value !== undefined) {
+          if (value instanceof Date) {
+            formData.append(key, value.toISOString());
+          } else if (value instanceof File) {
+            formData.append(key, value);
+          } else {
+            // This will handle string and boolean correctly by converting to string.
+            formData.append(key, String(value));
+          }
         }
       });
       if (serviceTypeInfo?.serviceType) {
@@ -284,6 +288,27 @@ export default function SubmitCasePage() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="hasInsurance"
+                render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                    <FormLabel>له تأمين صحي</FormLabel>
+                    <FormDescription>
+                        حدد ما إذا كان المريض لديه تأمين صحي.
+                    </FormDescription>
+                    </div>
+                    <FormControl>
+                    <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                    />
+                    </FormControl>
+                </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -304,17 +329,17 @@ export default function SubmitCasePage() {
                 />
                  <FormField
                   control={form.control}
-                  name="birthCertificate"
+                  name="identityDocument"
                   render={({ field: { onChange, value, ...rest }}) => (
                     <FormItem>
-                      <FormLabel>تحميل شهادة ميلاد</FormLabel>
+                      <FormLabel>تحميل شهادة ميلاد او البطاقة شخصية</FormLabel>
                       <FormControl>
                         <Input type="file" accept="image/*,application/pdf" className="pt-2"
                           {...rest}
                           onChange={(e) => onChange(e.target.files ? e.target.files[0] : null)}
                         />
                       </FormControl>
-                      <FormDescription>شهادة الميلاد إلزامية.</FormDescription>
+                      <FormDescription>شهادة الميلاد أو البطاقة الشخصية إلزامية.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

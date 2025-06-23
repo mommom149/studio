@@ -11,8 +11,9 @@ const FormSchema = z.object({
   contactEmail: z.string().email(),
   referringHospital: z.string(),
   serviceType: z.string(),
+  hasInsurance: z.preprocess((val) => val === 'true', z.boolean()),
   medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }),
-  birthCertificate: z.instanceof(File, { message: 'شهادة الميلاد مطلوبة.' }),
+  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }),
 });
 
 export async function getServiceTypeAction(ageInMonths: number) {
