@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow anyone to upload files to a case-specific folder during submission.
+    match /cases/{caseId}/{fileName} {
+      allow write: if true;
+      // Allow authenticated users to read files. This covers admin and hospital staff.
+      allow read: if request.auth != null;
+    }
+  }
+}

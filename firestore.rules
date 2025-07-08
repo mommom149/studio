@@ -1,34 +1,22 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all to secure the database.
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Allow anyone to create a new case submission.
-    match /cases/{caseId} {
-      allow create: if true;
-      
-      // Allow any authenticated user (admin, hospital, or future user types) to read case data.
-      // This is necessary for the case status and admin pages.
-      allow read: if request.auth != null;
-
-      // Only allow authenticated users to update cases (e.g., the admin changing status).
-      allow update: if request.auth != null;
-    }
-
-    // Allow any authenticated user to read the list of hospitals and their bed counts.
-    // This is needed for the admin dashboard.
+    // Hospitals can be read by any authenticated user (for admin panel)
+    // and can only be updated by the corresponding logged-in hospital user.
     match /hospitals/{hospitalId} {
       allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.email.split('@')[0] == hospitalId;
+    }
 
-      // IMPORTANT: Only allow a logged-in hospital user to update THEIR OWN data.
-      // We match the document ID (e.g., "hosp2") with the prefix of the user's email.
-      allow update: if request.auth != null && request.auth.token.email.split('@')[0] == hospitalId;
+    // Cases can be created by anyone.
+    // They can be read by anyone (for case status check).
+    // They can only be updated by the admin user.
+    match /cases/{caseId} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if request.auth != null && request.auth.token.email == 'admin@neobridge.com';
     }
   }
 }
