@@ -8,22 +8,15 @@ import { Label } from '@/components/ui/label';
 import { FileSearch, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AnimatePresence, motion } from 'framer-motion';
+import { getCaseDetails, type CaseDetails } from './actions';
 
-type CaseStatus = 'Received' | 'Reviewed' | 'Admitted';
-
-interface CaseDetails {
-  caseNumber: string;
-  patientName: string;
-  submissionDate: string;
-  type: 'NICU' | 'PICU' | 'ICU';
-  status: CaseStatus;
-  lastUpdateNote?: string;
-}
+type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
 
 const statusMap: Record<CaseStatus, { text: string; className: string }> = {
   Received: { text: 'تم الاستلام', className: 'bg-gray-500' },
   Reviewed: { text: 'قيد المراجعة', className: 'bg-yellow-500' },
-  Admitted: { text: 'تم القبول', className: 'bg-green-500' },
+  Admitted: { text: 'تم القبول', className: 'bg-blue-500' },
+  Assigned: { text: 'تم التعيين', className: 'bg-green-500' },
 };
 
 export default function CaseStatusPage() {
@@ -32,33 +25,26 @@ export default function CaseStatusPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CaseDetails | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!caseNumber) return;
     setIsLoading(true);
     setError(null);
     setResult(null);
 
-    // Mock API call
-    setTimeout(() => {
-      if (caseNumber.toUpperCase().startsWith('NICU') || caseNumber.toUpperCase().startsWith('PICU') || caseNumber.toUpperCase().startsWith('ICU')) {
-        const type = caseNumber.split('-')[0].toUpperCase() as 'NICU' | 'PICU' | 'ICU';
-        const statuses: CaseStatus[] = ['Received', 'Reviewed', 'Admitted'];
-        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-        
-        setResult({
-          caseNumber: caseNumber.toUpperCase(),
-          patientName: 'محمد علي',
-          submissionDate: new Date().toLocaleDateString('ar-EG'),
-          type,
-          status: randomStatus,
-          lastUpdateNote: randomStatus === 'Reviewed' ? 'الحالة مستقرة، في انتظار توفر سرير.' : undefined,
-        });
-      } else {
-        setError('رقم الحالة غير صالح. يرجى التحقق مرة أخرى.');
-      }
-      setIsLoading(false);
-    }, 1500);
+    try {
+        const caseDetails = await getCaseDetails(caseNumber);
+        if (caseDetails) {
+            setResult(caseDetails);
+        } else {
+            setError('لم يتم العثور على حالة بهذا الرقم. يرجى التحقق مرة أخرى.');
+        }
+    } catch (err) {
+        setError('حدث خطأ أثناء البحث عن الحالة. يرجى المحاولة مرة أخرى.');
+        console.error(err);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const getBadgeColor = (type: 'NICU' | 'PICU' | 'ICU') => {
@@ -124,12 +110,18 @@ export default function CaseStatusPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">تاريخ التقديم:</span>
-                    <span>{result.submissionDate}</span>
+                    <span>{new Date(result.submissionDate).toLocaleDateString('ar-EG')}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">الحالة:</span>
                     <Badge className={statusMap[result.status].className}>{statusMap[result.status].text}</Badge>
                   </div>
+                   {result.assignedTo && result.status === 'Assigned' && (
+                     <div className="flex justify-between pt-2">
+                        <span className="text-muted-foreground">تم التعيين إلى:</span>
+                        <span className="font-semibold">{result.assignedTo}</span>
+                    </div>
+                  )}
                   {result.lastUpdateNote && (
                      <div className="pt-2">
                         <p className="text-muted-foreground text-xs">ملاحظة آخر تحديث:</p>
