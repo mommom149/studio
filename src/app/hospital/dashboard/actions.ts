@@ -20,22 +20,31 @@ export interface HospitalData {
 export async function getHospitalData(hospitalId: string): Promise<HospitalData | null> {
   try {
     const hospitalRef = doc(db, 'hospitals', hospitalId);
-    const docSnap = await getDoc(hospitalRef);
+    let docSnap = await getDoc(hospitalRef);
 
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        name: data.name || 'اسم مستشفى غير معروف',
-        beds: data.beds || { nicu: 0, picu: 0, icu: 0 },
-        lastUpdated: ((data.lastUpdated as Timestamp)?.toDate() || new Date()).toISOString(),
-      };
-    } else {
-      console.warn(`No hospital document found for ID: ${hospitalId}`);
-      // Optional: create a default document if it doesn't exist
-      // await createDefaultHospitalDoc(hospitalId);
-      return null;
+    // If the hospital document doesn't exist, create one automatically.
+    if (!docSnap.exists()) {
+      console.warn(`No hospital document found for ID: ${hospitalId}. Creating a default document.`);
+      await createDefaultHospitalDoc(hospitalId);
+      
+      // Fetch the document again now that it has been created.
+      docSnap = await getDoc(hospitalRef);
+
+      // If it still doesn't exist, something went wrong with the creation.
+      if (!docSnap.exists()) {
+        console.error(`Failed to create and then fetch hospital document for ID: ${hospitalId}`);
+        return null;
+      }
     }
+
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      name: data.name || `مستشفى ${docSnap.id}`,
+      beds: data.beds || { nicu: 0, picu: 0, icu: 0 },
+      lastUpdated: ((data.lastUpdated as Timestamp)?.toDate() || new Date()).toISOString(),
+    };
+    
   } catch (error) {
     console.error(`Error fetching hospital data for ${hospitalId}:`, error);
     return null;
@@ -59,8 +68,8 @@ export async function updateHospitalBeds(hospitalId: string, beds: BedCounts): P
   }
 }
 
-// Optional helper function to create a hospital document if it doesn't exist
-// This can be useful for initial setup.
+// Helper function to create a hospital document if it doesn't exist.
+// This is useful for the initial setup of a new hospital user.
 export async function createDefaultHospitalDoc(hospitalId: string): Promise<void> {
     try {
         const hospitalRef = doc(db, 'hospitals', hospitalId);
@@ -69,6 +78,7 @@ export async function createDefaultHospitalDoc(hospitalId: string): Promise<void
             beds: { icu: 0, nicu: 0, picu: 0 },
             lastUpdated: Timestamp.now(),
         });
+        console.log(`Successfully created default document for ${hospitalId}`);
     } catch (error) {
         console.error(`Failed to create default doc for ${hospitalId}`, error);
     }
