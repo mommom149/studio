@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -12,7 +13,8 @@ import { auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function AdminAccessPage() {
-  const [secretCode, setSecretCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -22,10 +24,7 @@ export default function AdminAccessPage() {
     setIsLoading(true);
 
     try {
-      // The admin email is fixed, the user provides the password (secret code).
-      // You must create this user in your Firebase Authentication console.
-      // Email: admin@neobridge.com
-      await signInWithEmailAndPassword(auth, 'admin@neobridge.com', secretCode);
+      await signInWithEmailAndPassword(auth, email, password);
       
       toast({
         title: 'تم تسجيل الدخول بنجاح',
@@ -38,7 +37,7 @@ export default function AdminAccessPage() {
       toast({
         variant: 'destructive',
         title: 'خطأ في الدخول',
-        description: 'الرمز السري غير صحيح. يرجى المحاولة مرة أخرى.',
+        description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
       });
       setIsLoading(false);
     }
@@ -53,21 +52,32 @@ export default function AdminAccessPage() {
           </div>
           <CardTitle className="text-2xl">دخول المسؤول</CardTitle>
           <CardDescription>
-            الرجاء إدخال الرمز السري للوصول إلى لوحة التحكم الإدارية.
+            الرجاء إدخال البريد الإلكتروني وكلمة المرور للوصول إلى لوحة التحكم.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="secret-code">الرمز السري</Label>
+              <Label htmlFor="email">البريد الإلكتروني</Label>
               <Input
-                id="secret-code"
+                id="email"
+                type="email"
+                placeholder="admin@neobridge.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">كلمة المرور</Label>
+              <Input
+                id="password"
                 type="password"
                 placeholder="••••••••"
                 required
-                className="text-center tracking-widest"
-                value={secretCode}
-                onChange={(e) => setSecretCode(e.target.value)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
               />
             </div>
