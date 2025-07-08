@@ -11,67 +11,95 @@ import { Loader2, Minus, Plus, Save, LogOut, Bed } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-
-interface BedCounts {
-  nicu: number;
-  picu: number;
-  icu: number;
-}
+import { getHospitalData, updateHospitalBeds, type BedCounts } from './actions';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function HospitalDashboardPage() {
-  const [hospitalName] = useState('مستشفى النور التخصصي');
-  const [beds, setBeds] = useState<BedCounts>({ nicu: 3, picu: 2, icu: 1 });
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [hospitalId, setHospitalId] = useState<string | null>(null);
+  const [hospitalName, setHospitalName] = useState('');
+  const [beds, setBeds] = useState<BedCounts | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    await signOut(auth);
     toast({
       title: 'تم تسجيل الخروج',
-      description: 'تم تسجيل خروجك تلقائيًا بسبب عدم النشاط.',
-      variant: 'default',
+      description: 'لقد قمت بتسجيل الخروج بنجاح.',
     });
     router.push('/hospital');
   }, [router, toast]);
 
   useEffect(() => {
-    let logoutTimer: NodeJS.Timeout;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        const id = user.email.split('@')[0];
+        setHospitalId(id);
+      } else {
+        router.push('/hospital');
+      }
+    });
 
-    const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    return () => unsubscribe();
+  }, [router]);
 
-    const resetTimer = () => {
-      clearTimeout(logoutTimer);
-      logoutTimer = setTimeout(handleLogout, 10 * 60 * 1000); // 10 minutes
+  useEffect(() => {
+    if (!hospitalId) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      const data = await getHospitalData(hospitalId);
+      if (data) {
+        setHospitalName(data.name);
+        setBeds(data.beds);
+        setLastUpdated(data.lastUpdated);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'خطأ في جلب البيانات',
+          description: `لم يتم العثور على بيانات للمستشفى بالمعرف: ${hospitalId}. يرجى مراجعة المسؤول.`,
+        });
+        handleLogout();
+      }
+      setIsLoading(false);
     };
 
-    events.forEach(event => window.addEventListener(event, resetTimer));
-    resetTimer();
+    fetchData();
+  }, [hospitalId, toast, handleLogout]);
 
-    return () => {
-      clearTimeout(logoutTimer);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
-    };
-  }, [handleLogout]);
 
   const handleBedChange = (unit: keyof BedCounts, amount: number) => {
+    if (!beds) return;
     setBeds(prev => ({
-      ...prev,
-      [unit]: Math.max(0, prev[unit] + amount),
+      ...prev!,
+      [unit]: Math.max(0, (prev?.[unit] ?? 0) + amount),
     }));
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+    if (!hospitalId || !beds) return;
     setIsUpdating(true);
-    // In a real app, this would be an API call to save the bed counts
-    setTimeout(() => {
-      setLastUpdated(new Date());
-      setIsUpdating(false);
+    const result = await updateHospitalBeds(hospitalId, beds);
+    if (result.success) {
       toast({
         title: 'تم تحديث البيانات',
         description: 'تم حفظ عدد الأسرة المتاحة بنجاح.',
       });
-    }, 1200);
+      setLastUpdated(new Date()); // Optimistic update of timestamp
+    } else {
+       toast({
+        variant: 'destructive',
+        title: 'فشل التحديث',
+        description: result.message,
+      });
+    }
+    setIsUpdating(false);
   };
 
   const unitConfig: { key: keyof BedCounts; name: string; iconColor: string }[] = [
@@ -80,15 +108,60 @@ export default function HospitalDashboardPage() {
     { key: 'icu', name: 'وحدة العناية المركزة (ICU)', iconColor: 'text-teal-400' },
   ];
 
+  if (isLoading || !beds) {
+    return (
+       <div className="flex-1 flex items-center justify-center p-4 bg-background">
+          <Card className="w-full max-w-2xl mx-auto">
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-48 mt-2" />
+              </div>
+              <Skeleton className="h-10 w-10 rounded-full" />
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                      <TableRow>
+                          <TableHead className="w-[60%]">الوحدة</TableHead>
+                          <TableHead className="text-center">الأسرة المتاحة</TableHead>
+                          <TableHead className="text-center">التحكم</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unitConfig.map(u => (
+                      <TableRow key={u.key}>
+                        <TableCell><Skeleton className="h-6 w-3/4" /></TableCell>
+                        <TableCell className="text-center"><Skeleton className="h-8 w-12 mx-auto" /></TableCell>
+                        <TableCell className="text-center flex justify-center gap-2">
+                           <Skeleton className="h-9 w-9" />
+                           <Skeleton className="h-9 w-9" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+            <CardFooter className="flex-col sm:flex-row justify-between items-center gap-4">
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-11 w-44" />
+            </CardFooter>
+          </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-2xl mx-auto border-teal-500/30 shadow-teal-500/10 shadow-lg">
         <CardHeader className="flex-row items-center justify-between">
           <div>
             <CardTitle className="text-2xl">أهلاً بك، {hospitalName}</CardTitle>
-            <CardDescription>إدارة الأسرة المتاحة في وضع الكشك</CardDescription>
+            <CardDescription>إدارة الأسرة المتاحة في الوقت الفعلي</CardDescription>
           </div>
-           <Button variant="ghost" size="icon" onClick={() => router.push('/hospital')}>
+           <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-5 w-5"/>
               <span className="sr-only">تسجيل الخروج</span>
            </Button>
@@ -144,15 +217,17 @@ export default function HospitalDashboardPage() {
           </div>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row justify-between items-center gap-4">
-            <Badge variant="outline">
-                آخر تحديث: {formatDistanceToNow(lastUpdated, { addSuffix: true, locale: ar })}
-            </Badge>
+            {lastUpdated && (
+              <Badge variant="outline">
+                  آخر تحديث: {formatDistanceToNow(lastUpdated, { addSuffix: true, locale: ar })}
+              </Badge>
+            )}
             <Button 
               className="w-full sm:w-auto h-11 bg-teal-600 hover:bg-teal-700 text-white hover:glow-icu" 
               onClick={handleUpdate} 
               disabled={isUpdating}
             >
-                {isUpdating ? <Loader2 className="animate-spin" /> : <Save />}
+                {isUpdating ? <Loader2 className="animate-spin" /> : <Save className="me-2" />}
                 {isUpdating ? 'جاري التحديث...' : 'تحديث عدد الأسرة'}
             </Button>
         </CardFooter>
