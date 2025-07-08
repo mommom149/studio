@@ -16,13 +16,30 @@ import { ClipboardList, FileText, Hospital, RefreshCw, Search, Loader2 } from "l
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { getCases, getHospitals, updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient, type HospitalData as HospitalDataForClient } from './actions';
+import { updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient, type HospitalData as HospitalDataForClient } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
+
 
 type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
 type CaseType = 'NICU' | 'PICU' | 'ICU';
+
+// Shape of case data from Firestore, with fields marked as optional to reflect real-world data
+interface CaseFromFirestore {
+  patientName?: string;
+  dob?: string; // ISO string
+  serviceType?: 'NICU' | 'PICU' | 'ICU';
+  status?: 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
+  medicalReportUrl?: string;
+  submissionDate?: Timestamp;
+  adminNote?: string;
+  assignedTo?: string;
+  assignedBy?: string;
+  assignedAt?: Timestamp;
+  [key: string]: any;
+}
 
 interface Case extends Omit<CaseForClient, 'submissionDate' | 'assignedAt'> {
   submissionDate: Date;
@@ -32,6 +49,40 @@ interface Case extends Omit<CaseForClient, 'submissionDate' | 'assignedAt'> {
 interface HospitalData extends Omit<HospitalDataForClient, 'lastUpdated'> {
   lastUpdated: Date;
 }
+
+function calculateAge(dob: string): string {
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) {
+      return 'عمر غير معروف';
+    }
+    const now = new Date();
+    let years = now.getFullYear() - birthDate.getFullYear();
+    let months = now.getMonth() - birthDate.getMonth();
+    let days = now.getDate() - birthDate.getDate();
+
+    if (days < 0) {
+      months--;
+      days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const ageParts: string[] = [];
+    if (years > 0) {
+        ageParts.push(`${years} سنة`);
+        if (months > 0) ageParts.push(`${months} شهر`);
+    } else if (months > 0) {
+        ageParts.push(`${months} شهر`);
+        if (days > 0) ageParts.push(`${days} يوم`);
+    } else if (days >= 0) {
+        ageParts.push(`${days} يوم`);
+    }
+    
+    return ageParts.length > 0 ? ageParts.join(' و ') : 'حديث الولادة';
+}
+
 
 export default function AdminDashboardPage() {
   const [cases, setCases] = useState<Case[]>([]);
@@ -66,11 +117,45 @@ export default function AdminDashboardPage() {
     }
 
     try {
-        const [fetchedCases, fetchedHospitals] = await Promise.all([
-            getCases(),
-            getHospitals()
-        ]);
+        // Fetch Cases directly from Firestore
+        const casesRef = collection(db, 'cases');
+        const qCases = query(casesRef, orderBy('submissionDate', 'desc'));
+        const casesSnapshot = await getDocs(qCases);
+        const fetchedCases: CaseForClient[] = casesSnapshot.docs.map(doc => {
+            const data = doc.data() as CaseFromFirestore;
+            if (!data.submissionDate || typeof data.submissionDate.toDate !== 'function') return null;
+            if (!data.patientName || !data.dob || !data.serviceType) return null;
+            
+            return {
+                id: doc.id,
+                patientName: data.patientName,
+                patientAge: calculateAge(data.dob),
+                type: data.serviceType,
+                status: data.status || 'Received',
+                reportUrl: data.medicalReportUrl,
+                adminNote: data.adminNote || '',
+                submissionDate: data.submissionDate.toDate().toISOString(),
+                assignedTo: data.assignedTo,
+                assignedBy: data.assignedBy,
+                assignedAt: data.assignedAt ? data.assignedAt.toDate().toISOString() : undefined,
+            };
+        }).filter((c): c is CaseForClient => c !== null);
 
+        // Fetch Hospitals directly from Firestore
+        const hospitalsRef = collection(db, 'hospitals');
+        const qHospitals = query(hospitalsRef, orderBy('name'));
+        const hospitalsSnapshot = await getDocs(qHospitals);
+        const fetchedHospitals: HospitalDataForClient[] = hospitalsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name || 'اسم مستشفى غير معروف',
+                beds: data.beds || { icu: 0, nicu: 0, picu: 0 },
+                lastUpdated: (data.lastUpdated as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+            };
+        });
+
+        // Process and set state
         const processedCases: Case[] = fetchedCases.map(c => ({
             ...c,
             submissionDate: new Date(c.submissionDate),
@@ -85,16 +170,18 @@ export default function AdminDashboardPage() {
         setHospitals(processedHospitals);
 
     } catch (error) {
+        console.error("Error fetching data:", error);
         toast({
             variant: 'destructive',
             title: 'فشل في تحميل البيانات',
-            description: 'حدث خطأ أثناء جلب البيانات من قاعدة البيانات.',
+            description: 'حدث خطأ أثناء جلب البيانات. قد تكون هناك مشكلة في أذونات الوصول إلى قاعدة البيانات.',
         });
     } finally {
         setIsLoadingCases(false);
         setIsLoadingHospitals(false);
     }
   }, [toast]);
+
 
   useEffect(() => {
     if (!isAuthLoading) {
