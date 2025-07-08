@@ -1,15 +1,34 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cases collection
+
+    // Default deny all to secure the database.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow anyone to create a new case submission.
     match /cases/{caseId} {
-      // Anyone can submit a new case (create). This is for the public form.
       allow create: if true;
       
-      // Only authenticated users can read, update, or delete cases.
-      // This protects the data and allows admins/hospitals to manage it.
-      allow read, update, delete: if request.auth != null;
+      // Allow any authenticated user (admin, hospital, or future user types) to read case data.
+      // This is necessary for the case status and admin pages.
+      allow read: if request.auth != null;
+
+      // Only allow authenticated users to update cases (e.g., the admin changing status).
+      allow update: if request.auth != null;
+    }
+
+    // Allow any authenticated user to read the list of hospitals and their bed counts.
+    // This is needed for the admin dashboard.
+    match /hospitals/{hospitalId} {
+      allow read: if request.auth != null;
+
+      // IMPORTANT: Only allow a logged-in hospital user to update THEIR OWN data.
+      // We match the document ID (e.g., "hosp2") with the prefix of the user's email.
+      allow update: if request.auth != null && request.auth.token.email.split('@')[0] == hospitalId;
     }
   }
 }
