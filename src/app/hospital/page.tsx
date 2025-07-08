@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -12,7 +13,7 @@ import { auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function HospitalLoginPage() {
-  const [hospitalId, setHospitalId] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -23,10 +24,7 @@ export default function HospitalLoginPage() {
     setIsLoading(true);
 
     try {
-      // We create a standardized email from the hospital ID to use with Firebase Auth.
-      // You must create a corresponding user in your Firebase console.
-      // Example: for Hospital ID "hosp123", create user "hosp123@neobridge.com".
-      const email = `${hospitalId}@neobridge.com`;
+      // Use the email directly, no more constructing it from an ID.
       await signInWithEmailAndPassword(auth, email, password);
 
       toast({
@@ -40,7 +38,7 @@ export default function HospitalLoginPage() {
       toast({
         variant: 'destructive',
         title: 'خطأ في الدخول',
-        description: 'معرف المستشفى أو كلمة المرور غير صحيحة.',
+        description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
       });
       setIsLoading(false);
     }
@@ -61,14 +59,14 @@ export default function HospitalLoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="hospital-id">معرف المستشفى</Label>
+              <Label htmlFor="email">البريد الإلكتروني</Label>
               <Input
-                id="hospital-id"
-                type="text"
-                placeholder="أدخل معرف المستشفى"
+                id="email"
+                type="email"
+                placeholder="hosp_id@neobridge.com"
                 required
-                value={hospitalId}
-                onChange={(e) => setHospitalId(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
               />
             </div>
