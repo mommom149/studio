@@ -14,7 +14,7 @@ export interface HospitalData {
   id: string;
   name: string;
   beds: BedCounts;
-  lastUpdated: Date;
+  lastUpdated: string; // ISO string for serialization
 }
 
 export async function getHospitalData(hospitalId: string): Promise<HospitalData | null> {
@@ -28,7 +28,7 @@ export async function getHospitalData(hospitalId: string): Promise<HospitalData 
         id: docSnap.id,
         name: data.name || 'اسم مستشفى غير معروف',
         beds: data.beds || { nicu: 0, picu: 0, icu: 0 },
-        lastUpdated: (data.lastUpdated as Timestamp)?.toDate() || new Date(),
+        lastUpdated: ((data.lastUpdated as Timestamp)?.toDate() || new Date()).toISOString(),
       };
     } else {
       console.warn(`No hospital document found for ID: ${hospitalId}`);

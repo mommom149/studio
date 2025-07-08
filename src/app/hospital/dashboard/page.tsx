@@ -58,7 +58,7 @@ export default function HospitalDashboardPage() {
       if (data) {
         setHospitalName(data.name);
         setBeds(data.beds);
-        setLastUpdated(data.lastUpdated);
+        setLastUpdated(new Date(data.lastUpdated));
       } else {
         toast({
           variant: 'destructive',
