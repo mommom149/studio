@@ -1,0 +1,15 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cases collection
+    match /cases/{caseId} {
+      // Anyone can submit a new case (create). This is for the public form.
+      allow create: if true;
+      
+      // Only authenticated users can read, update, or delete cases.
+      // This protects the data and allows admins/hospitals to manage it.
+      allow read, update, delete: if request.auth != null;
+    }
+  }
+}
