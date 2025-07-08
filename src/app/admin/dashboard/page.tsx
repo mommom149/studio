@@ -15,7 +15,7 @@ import { ClipboardList, FileText, Hospital, RefreshCw, Search, Send, Loader2 } f
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { getCases, type CaseForClient } from './actions';
+import { getCases, updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
@@ -55,6 +55,7 @@ const initialHospitals: HospitalData[] = [
 export default function AdminDashboardPage() {
   const [cases, setCases] = useState<Case[]>([]);
   const [isLoadingCases, setIsLoadingCases] = useState(true);
+  const [updatingCaseId, setUpdatingCaseId] = useState<string | null>(null);
   const [hospitals, setHospitals] = useState<HospitalData[]>(initialHospitals);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -115,25 +116,34 @@ export default function AdminDashboardPage() {
       );
   }, [cases, typeFilter, statusFilter, searchQuery]);
 
-  const updateCase = (caseId: string, updates: Partial<Case>) => {
-    // TODO: This should update Firestore. For now, it only updates local state.
-    setCases(prevCases => prevCases.map(c => c.id === caseId ? { ...c, ...updates } : c));
+  const updateCase = async (caseId: string, updates: Partial<{ status: CaseStatus, adminNote: string }>) => {
+    setUpdatingCaseId(caseId);
+    const result = await updateCaseAction(caseId, updates);
+    if (result.success) {
+      toast({ title: 'تم تحديث الحالة' });
+      setCases(prevCases => prevCases.map(c => c.id === caseId ? { ...c, ...updates } : c));
+    } else {
+      toast({ variant: 'destructive', title: 'فشل التحديث', description: result.message });
+    }
+    setUpdatingCaseId(null);
   };
 
-  const handleAssign = (caseId: string, hospitalId: string) => {
-    // TODO: This should update Firestore. For now, it only updates local state.
+  const handleAssign = async (caseId: string, hospitalId: string) => {
     const hospital = hospitals.find(h => h.id === hospitalId);
     if (hospital) {
-        updateCase(caseId, { 
-            assignedTo: hospital.name,
-            status: 'Assigned',
-            assignedBy: 'admin@neobridge.com',
-            assignedAt: new Date(),
-        });
-        toast({
-            title: 'تم تعيين الحالة بنجاح!',
-            description: `تم تعيين الحالة ${caseId} إلى ${hospital.name}.`,
-        });
+        setUpdatingCaseId(caseId);
+        const result = await assignCaseToHospital(caseId, hospital.name);
+        if (result.success) {
+            toast({
+                title: 'تم تعيين الحالة بنجاح!',
+                description: `تم تعيين الحالة ${caseId} إلى ${hospital.name}.`,
+            });
+            // Refetch to get the server-generated timestamp and ensure data consistency
+            fetchCases(); 
+        } else {
+             toast({ variant: 'destructive', title: 'فشل تعيين الحالة', description: result.message });
+        }
+        setUpdatingCaseId(null);
     }
   };
 
@@ -226,7 +236,12 @@ export default function AdminDashboardPage() {
                   ))
                 ) : filteredCases.length > 0 ? (
                     filteredCases.map((c) => (
-                      <Card key={c.id} className="flex flex-col">
+                      <Card key={c.id} className="flex flex-col relative">
+                          {updatingCaseId === c.id && (
+                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
+                              <Loader2 className="h-6 w-6 animate-spin" />
+                            </div>
+                          )}
                           <CardHeader>
                               <div className="flex justify-between items-start">
                                   <CardTitle className="text-lg">{c.patientName} <span className="text-sm font-normal text-muted-foreground">({c.patientAge})</span></CardTitle>
@@ -237,7 +252,7 @@ export default function AdminDashboardPage() {
                           <CardContent className="space-y-4 flex-1">
                               <div>
                                   <Label>الحالة</Label>
-                                  <Select value={c.status} onValueChange={(newStatus) => updateCase(c.id, { status: newStatus as CaseStatus })}>
+                                  <Select value={c.status} onValueChange={(newStatus) => updateCase(c.id, { status: newStatus as CaseStatus })} disabled={updatingCaseId === c.id}>
                                       <SelectTrigger>
                                           <SelectValue />
                                       </SelectTrigger>
@@ -250,7 +265,7 @@ export default function AdminDashboardPage() {
                               </div>
                               <div>
                                   <Label htmlFor={`note-${c.id}`}>ملاحظات إدارية</Label>
-                                  <Textarea id={`note-${c.id}`} placeholder="إضافة ملاحظة..." value={c.adminNote} onChange={(e) => updateCase(c.id, { adminNote: e.target.value })} />
+                                  <Textarea id={`note-${c.id}`} placeholder="إضافة ملاحظة..." defaultValue={c.adminNote} onBlur={(e) => updateCase(c.id, { adminNote: e.target.value })} disabled={updatingCaseId === c.id} />
                               </div>
                               {c.reportUrl && <Button asChild variant="secondary" className="w-full"><a href={c.reportUrl} target="_blank" rel="noopener noreferrer"><FileText className="me-2"/> عرض التقرير الطبي</a></Button>}
                           </CardContent>
@@ -259,7 +274,7 @@ export default function AdminDashboardPage() {
                                   <div className='w-full space-y-2'>
                                       <Label>تعيين إلى مستشفى</Label>
                                       <div className="flex w-full gap-2">
-                                          <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)}>
+                                          <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)} disabled={updatingCaseId === c.id}>
                                               <SelectTrigger>
                                                   <SelectValue placeholder="اختر مستشفى..."/>
                                               </SelectTrigger>

@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, Timestamp, doc, updateDoc } from 'firebase/firestore';
 
 // Shape of data from Firestore, with fields marked as optional to reflect real-world data
 interface CaseFromFirestore {
@@ -110,5 +110,48 @@ export async function getCases(): Promise<CaseForClient[]> {
     console.error("Error fetching cases from Firestore:", error);
     // Return empty array on error to prevent crashing the client
     return [];
+  }
+}
+
+export async function updateCase(caseId: string, updates: { status?: CaseForClient['status']; adminNote?: string }): Promise<{ success: boolean; message?: string }> {
+  if (!caseId) {
+    return { success: false, message: 'Case ID is required.' };
+  }
+  try {
+    const caseRef = doc(db, 'cases', caseId);
+    const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+
+    if (Object.keys(cleanUpdates).length === 0) {
+      return { success: true }; // No updates to perform
+    }
+
+    await updateDoc(caseRef, cleanUpdates);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error updating case ${caseId}:`, error);
+    return { success: false, message: 'Failed to update case.' };
+  }
+}
+
+export async function assignCaseToHospital(
+  caseId: string, 
+  hospitalName: string,
+  adminUser: string = 'admin@neobridge.com' // Placeholder until we have auth
+): Promise<{ success: boolean; message?: string }> {
+   if (!caseId || !hospitalName) {
+    return { success: false, message: 'Case ID and hospital name are required.' };
+  }
+  try {
+    const caseRef = doc(db, 'cases', caseId);
+    await updateDoc(caseRef, {
+      status: 'Assigned',
+      assignedTo: hospitalName,
+      assignedBy: adminUser,
+      assignedAt: Timestamp.now(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error assigning case ${caseId} to hospital:`, error);
+    return { success: false, message: 'Failed to assign case.' };
   }
 }

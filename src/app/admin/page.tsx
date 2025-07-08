@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield, Loader2 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function AdminAccessPage() {
   const [secretCode, setSecretCode] = useState('');
@@ -15,27 +17,31 @@ export default function AdminAccessPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate network delay
-    setTimeout(() => {
-      if (secretCode === 'admin123') {
-        toast({
-          title: 'تم تسجيل الدخول بنجاح',
-          description: 'جاري إعادة توجيهك إلى لوحة التحكم.',
-        });
-        router.push('/admin/dashboard');
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'خطأ في الدخول',
-          description: 'الرمز السري غير صحيح. يرجى المحاولة مرة أخرى.',
-        });
-        setIsLoading(false);
-      }
-    }, 1000);
+    try {
+      // The admin email is fixed, the user provides the password (secret code).
+      // You must create this user in your Firebase Authentication console.
+      // Email: admin@neobridge.com
+      await signInWithEmailAndPassword(auth, 'admin@neobridge.com', secretCode);
+      
+      toast({
+        title: 'تم تسجيل الدخول بنجاح',
+        description: 'جاري إعادة توجيهك إلى لوحة التحكم.',
+      });
+      router.push('/admin/dashboard');
+
+    } catch (error) {
+      console.error("Admin login failed:", error);
+      toast({
+        variant: 'destructive',
+        title: 'خطأ في الدخول',
+        description: 'الرمز السري غير صحيح. يرجى المحاولة مرة أخرى.',
+      });
+      setIsLoading(false);
+    }
   };
 
   return (

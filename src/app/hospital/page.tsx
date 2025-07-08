@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Hospital, Loader2 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function HospitalLoginPage() {
   const [hospitalId, setHospitalId] = useState('');
@@ -16,28 +18,32 @@ export default function HospitalLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate network delay
-    setTimeout(() => {
-      // In a real app, you'd fetch this from a backend.
-      if (hospitalId === 'hosp123' && password === 'pass123') {
-        toast({
-          title: 'تم تسجيل الدخول بنجاح',
-          description: 'جاري إعادة توجيهك إلى لوحة التحكم.',
-        });
-        router.push('/hospital/dashboard');
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'خطأ في الدخول',
-          description: 'معرف المستشفى أو كلمة المرور غير صحيحة.',
-        });
-        setIsLoading(false);
-      }
-    }, 1000);
+    try {
+      // We create a standardized email from the hospital ID to use with Firebase Auth.
+      // You must create a corresponding user in your Firebase console.
+      // Example: for Hospital ID "hosp123", create user "hosp123@neobridge.com".
+      const email = `${hospitalId}@neobridge.com`;
+      await signInWithEmailAndPassword(auth, email, password);
+
+      toast({
+        title: 'تم تسجيل الدخول بنجاح',
+        description: 'جاري إعادة توجيهك إلى لوحة التحكم.',
+      });
+      router.push('/hospital/dashboard');
+
+    } catch (error) {
+      console.error("Hospital login failed:", error);
+      toast({
+        variant: 'destructive',
+        title: 'خطأ في الدخول',
+        description: 'معرف المستشفى أو كلمة المرور غير صحيحة.',
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
