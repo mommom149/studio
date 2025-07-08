@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,52 +11,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, FileText, Hospital, RefreshCw, Search, Send, Loader2 } from "lucide-react";
+import { ClipboardList, FileText, Hospital, RefreshCw, Search, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { getCases, updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient } from './actions';
+import { getCases, getHospitals, updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient, type HospitalData as HospitalDataForClient } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
 type CaseType = 'NICU' | 'PICU' | 'ICU';
 
-interface Case {
-  id: string;
-  patientName: string;
-  patientAge: string;
-  type: CaseType;
-  status: CaseStatus;
-  reportUrl?: string;
-  adminNote: string;
+interface Case extends Omit<CaseForClient, 'submissionDate' | 'assignedAt'> {
   submissionDate: Date;
-  assignedTo?: string;
-  assignedBy?: string;
   assignedAt?: Date;
 }
 
-interface HospitalData {
-  id: string;
-  name: string;
-  beds: {
-    nicu: number;
-    picu: number;
-    icu: number;
-  };
+interface HospitalData extends Omit<HospitalDataForClient, 'lastUpdated'> {
   lastUpdated: Date;
 }
 
-const initialHospitals: HospitalData[] = [
-  { id: 'hosp1', name: 'مستشفى الملك فهد', beds: { nicu: 3, picu: 0, icu: 1 }, lastUpdated: new Date() },
-  { id: 'hosp2', name: 'مستشفى النور التخصصي', beds: { nicu: 5, picu: 2, icu: 8 }, lastUpdated: new Date(Date.now() - 10 * 60 * 1000) },
-  { id: 'hosp3', name: 'مستشفى الملك عبدالله', beds: { nicu: 1, picu: 1, icu: 1 }, lastUpdated: new Date(Date.now() - 30 * 60 * 1000) },
-];
-
 export default function AdminDashboardPage() {
   const [cases, setCases] = useState<Case[]>([]);
+  const [hospitals, setHospitals] = useState<HospitalData[]>([]);
   const [isLoadingCases, setIsLoadingCases] = useState(true);
+  const [isLoadingHospitals, setIsLoadingHospitals] = useState(true);
   const [updatingCaseId, setUpdatingCaseId] = useState<string | null>(null);
-  const [hospitals, setHospitals] = useState<HospitalData[]>(initialHospitals);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -64,46 +43,59 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
-  const fetchCases = async () => {
-    setIsLoadingCases(true);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
+        setIsLoadingCases(true);
+        setIsLoadingHospitals(true);
+    }
+
     try {
-        const fetchedCases = await getCases();
+        const [fetchedCases, fetchedHospitals] = await Promise.all([
+            getCases(),
+            getHospitals()
+        ]);
+
         const processedCases: Case[] = fetchedCases.map(c => ({
             ...c,
             submissionDate: new Date(c.submissionDate),
             assignedAt: c.assignedAt ? new Date(c.assignedAt) : undefined,
         }));
         setCases(processedCases);
+        
+        const processedHospitals: HospitalData[] = fetchedHospitals.map(h => ({
+            ...h,
+            lastUpdated: new Date(h.lastUpdated),
+        }));
+        setHospitals(processedHospitals);
+
     } catch (error) {
         toast({
             variant: 'destructive',
-            title: 'فشل في تحميل الحالات',
+            title: 'فشل في تحميل البيانات',
             description: 'حدث خطأ أثناء جلب البيانات من قاعدة البيانات.',
         });
     } finally {
         setIsLoadingCases(false);
+        setIsLoadingHospitals(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
-    fetchCases();
-  }, []);
+    fetchData();
+  }, [fetchData]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    fetchCases();
-    setTimeout(() => {
-      setHospitals(prev => prev.map(h => ({ ...h, lastUpdated: new Date() })));
-      setLastRefreshed(new Date());
-      setIsRefreshing(false);
-      toast({ title: 'تم تحديث البيانات' });
-    }, 500);
-  };
+    await fetchData(true);
+    setLastRefreshed(new Date());
+    setIsRefreshing(false);
+    toast({ title: 'تم تحديث البيانات' });
+  }, [fetchData, toast]);
   
   useEffect(() => {
     const interval = setInterval(handleRefresh, 5 * 60 * 1000); // 5 minutes
     return () => clearInterval(interval);
-  }, []);
+  }, [handleRefresh]);
 
   const filteredCases = useMemo(() => {
     return cases
@@ -139,7 +131,7 @@ export default function AdminDashboardPage() {
                 description: `تم تعيين الحالة ${caseId} إلى ${hospital.name}.`,
             });
             // Refetch to get the server-generated timestamp and ensure data consistency
-            fetchCases(); 
+            fetchData(true); 
         } else {
              toast({ variant: 'destructive', title: 'فشل تعيين الحالة', description: result.message });
         }
@@ -274,9 +266,9 @@ export default function AdminDashboardPage() {
                                   <div className='w-full space-y-2'>
                                       <Label>تعيين إلى مستشفى</Label>
                                       <div className="flex w-full gap-2">
-                                          <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)} disabled={updatingCaseId === c.id}>
+                                          <Select onValueChange={(hospitalId) => handleAssign(c.id, hospitalId)} disabled={updatingCaseId === c.id || isLoadingHospitals}>
                                               <SelectTrigger>
-                                                  <SelectValue placeholder="اختر مستشفى..."/>
+                                                  <SelectValue placeholder={isLoadingHospitals ? "جاري تحميل المستشفيات..." : "اختر مستشفى..."}/>
                                               </SelectTrigger>
                                               <SelectContent>
                                                   {hospitals.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
@@ -330,7 +322,17 @@ export default function AdminDashboardPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {hospitals.map(h => (
+                        {isLoadingHospitals ? (
+                            Array.from({ length: 3 }).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : hospitals.map(h => (
                             <TableRow key={h.id}>
                                 <TableCell className="font-medium">{h.name}</TableCell>
                                 <TableCell><BedStatusIndicator count={h.beds.nicu} /></TableCell>

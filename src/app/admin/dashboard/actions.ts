@@ -3,7 +3,7 @@
 import { db } from '@/lib/firebase';
 import { collection, getDocs, orderBy, query, Timestamp, doc, updateDoc } from 'firebase/firestore';
 
-// Shape of data from Firestore, with fields marked as optional to reflect real-world data
+// Shape of case data from Firestore, with fields marked as optional to reflect real-world data
 interface CaseFromFirestore {
   patientName?: string;
   dob?: string; // ISO string
@@ -18,7 +18,7 @@ interface CaseFromFirestore {
   [key: string]: any;
 }
 
-// Shape of data sent to the client (serializable)
+// Shape of case data sent to the client (serializable)
 export interface CaseForClient {
   id: string;
   patientName:string;
@@ -31,6 +31,21 @@ export interface CaseForClient {
   assignedTo?: string;
   assignedBy?: string;
   assignedAt?: string; // ISO string
+}
+
+// Shape of hospital bed counts
+export interface BedCounts {
+  nicu: number;
+  picu: number;
+  icu: number;
+}
+
+// Shape of hospital data sent to the client (serializable)
+export interface HospitalData {
+  id: string;
+  name: string;
+  beds: BedCounts;
+  lastUpdated: string; // ISO string
 }
 
 function calculateAge(dob: string): string {
@@ -112,6 +127,35 @@ export async function getCases(): Promise<CaseForClient[]> {
     return [];
   }
 }
+
+export async function getHospitals(): Promise<HospitalData[]> {
+    try {
+        const hospitalsRef = collection(db, 'hospitals');
+        const q = query(hospitalsRef, orderBy('name'));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            return [];
+        }
+
+        const hospitals: HospitalData[] = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name || 'اسم مستشفى غير معروف',
+                beds: data.beds || { icu: 0, nicu: 0, picu: 0 },
+                lastUpdated: (data.lastUpdated as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+            };
+        });
+
+        return hospitals;
+
+    } catch (error) {
+        console.error("Error fetching hospitals from Firestore:", error);
+        return [];
+    }
+}
+
 
 export async function updateCase(caseId: string, updates: { status?: CaseForClient['status']; adminNote?: string }): Promise<{ success: boolean; message?: string }> {
   if (!caseId) {
