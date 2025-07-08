@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,8 @@ import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { getCases, getHospitals, updateCase as updateCaseAction, assignCaseToHospital, type CaseForClient, type HospitalData as HospitalDataForClient } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 type CaseStatus = 'Received' | 'Reviewed' | 'Admitted' | 'Assigned';
 type CaseType = 'NICU' | 'PICU' | 'ICU';
@@ -41,7 +44,20 @@ export default function AdminDashboardPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser || currentUser.email !== 'admin@neobridge.com') {
+        router.push('/admin');
+      } else {
+        setIsAuthLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) {
@@ -81,8 +97,10 @@ export default function AdminDashboardPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!isAuthLoading) {
+      fetchData();
+    }
+  }, [fetchData, isAuthLoading]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -93,9 +111,10 @@ export default function AdminDashboardPage() {
   }, [fetchData, toast]);
   
   useEffect(() => {
+    if (isAuthLoading) return;
     const interval = setInterval(handleRefresh, 5 * 60 * 1000); // 5 minutes
     return () => clearInterval(interval);
-  }, [handleRefresh]);
+  }, [handleRefresh, isAuthLoading]);
 
   const filteredCases = useMemo(() => {
     return cases
@@ -165,6 +184,14 @@ export default function AdminDashboardPage() {
     );
   };
   
+  if (isAuthLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">لوحة التحكم الإدارية</h1>

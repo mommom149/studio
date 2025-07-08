@@ -7,20 +7,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Minus, Plus, Save, LogOut, Bed } from "lucide-react";
+import { Loader2, Minus, Plus, Save, LogOut, Bed, Terminal } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { getHospitalData, updateHospitalBeds, type BedCounts } from './actions';
 import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function HospitalDashboardPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [hospitalId, setHospitalId] = useState<string | null>(null);
   const [hospitalName, setHospitalName] = useState('');
   const [beds, setBeds] = useState<BedCounts | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -29,17 +32,18 @@ export default function HospitalDashboardPage() {
 
   const handleLogout = useCallback(async () => {
     await signOut(auth);
+    router.push('/hospital');
     toast({
       title: 'تم تسجيل الخروج',
       description: 'لقد قمت بتسجيل الخروج بنجاح.',
     });
-    router.push('/hospital');
   }, [router, toast]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        const id = user.email.split('@')[0];
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser && currentUser.email) {
+        setUser(currentUser);
+        const id = currentUser.email.split('@')[0];
         setHospitalId(id);
       } else {
         router.push('/hospital');
@@ -54,24 +58,20 @@ export default function HospitalDashboardPage() {
 
     const fetchData = async () => {
       setIsLoading(true);
+      setError(null);
       const data = await getHospitalData(hospitalId);
       if (data) {
         setHospitalName(data.name);
         setBeds(data.beds);
         setLastUpdated(new Date(data.lastUpdated));
       } else {
-        toast({
-          variant: 'destructive',
-          title: 'خطأ في جلب البيانات',
-          description: `لم يتم العثور على بيانات للمستشفى بالمعرف: ${hospitalId}. يرجى مراجعة المسؤول.`,
-        });
-        handleLogout();
+        setError(`لم يتم العثور على بيانات للمستشفى بالمعرف: ${hospitalId}. يرجى الاتصال بالمسؤول لإعداد حساب المستشفى الخاص بك في قاعدة البيانات.`);
       }
       setIsLoading(false);
     };
 
     fetchData();
-  }, [hospitalId, toast, handleLogout]);
+  }, [hospitalId]);
 
 
   const handleBedChange = (unit: keyof BedCounts, amount: number) => {
@@ -108,7 +108,7 @@ export default function HospitalDashboardPage() {
     { key: 'icu', name: 'وحدة العناية المركزة (ICU)', iconColor: 'text-teal-400' },
   ];
 
-  if (isLoading || !beds) {
+  if (isLoading) {
     return (
        <div className="flex-1 flex items-center justify-center p-4 bg-background">
           <Card className="w-full max-w-2xl mx-auto">
@@ -151,6 +151,38 @@ export default function HospitalDashboardPage() {
           </Card>
       </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4 bg-background">
+        <Card className="w-full max-w-2xl mx-auto border-destructive">
+          <CardHeader>
+            <CardTitle>خطأ في إعداد الحساب</CardTitle>
+            <CardDescription>
+              مرحباً {user?.email}, هناك مشكلة في الوصول إلى بيانات المستشفى الخاصة بك.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <Terminal className="h-4 w-4" />
+              <AlertTitle>بيانات المستشفى غير موجودة</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="me-2" />
+              تسجيل الخروج
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (!beds) {
+    return null; // Should be covered by loading/error states
   }
 
   return (
