@@ -43,7 +43,7 @@ export default function HospitalDashboardPage() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser && currentUser.email) {
         setUser(currentUser);
-        const id = currentUser.email.split('@')[0];
+        const id = currentUser.email.split('@')[0].toLowerCase();
         setHospitalId(id);
       } else {
         router.push('/hospital');
