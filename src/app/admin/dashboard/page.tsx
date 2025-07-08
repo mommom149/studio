@@ -132,7 +132,8 @@ export default function AdminDashboardPage() {
     const result = await updateCaseAction(caseId, updates);
     if (result.success) {
       toast({ title: 'تم تحديث الحالة' });
-      setCases(prevCases => prevCases.map(c => c.id === caseId ? { ...c, ...updates } : c));
+      // Refetch to get the latest data and ensure consistency
+      fetchData(true);
     } else {
       toast({ variant: 'destructive', title: 'فشل التحديث', description: result.message });
     }
