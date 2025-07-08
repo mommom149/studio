@@ -11,11 +11,24 @@ import { Loader2, Minus, Plus, Save, LogOut, Bed, Terminal } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { getHospitalData, updateHospitalBeds, type BedCounts } from './actions';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { doc, getDoc, updateDoc, Timestamp, setDoc } from 'firebase/firestore';
+
+export interface BedCounts {
+  nicu: number;
+  picu: number;
+  icu: number;
+}
+
+export interface HospitalData {
+  id: string;
+  name: string;
+  beds: BedCounts;
+  lastUpdated: Date;
+}
 
 export default function HospitalDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -53,6 +66,74 @@ export default function HospitalDashboardPage() {
     return () => unsubscribe();
   }, [router]);
 
+  const createDefaultHospitalDoc = useCallback(async (hId: string): Promise<void> => {
+    try {
+        const hospitalRef = doc(db, 'hospitals', hId);
+        await setDoc(hospitalRef, {
+            name: `مستشفى ${hId}`,
+            beds: { icu: 0, nicu: 0, picu: 0 },
+            lastUpdated: Timestamp.now(),
+        });
+        console.log(`Successfully created default document for ${hId}`);
+    } catch (error) {
+        console.error(`Failed to create default doc for ${hId}`, error);
+        throw new Error('Failed to create hospital profile.');
+    }
+  }, []);
+
+  const getHospitalData = useCallback(async (hId: string): Promise<HospitalData | null> => {
+    try {
+      const hospitalRef = doc(db, 'hospitals', hId);
+      let docSnap = await getDoc(hospitalRef);
+
+      if (!docSnap.exists()) {
+        console.warn(`No hospital document found for ID: ${hId}. Creating a default document.`);
+        await createDefaultHospitalDoc(hId);
+        docSnap = await getDoc(hospitalRef);
+
+        if (!docSnap.exists()) {
+          console.error(`Failed to create and then fetch hospital document for ID: ${hId}`);
+          return null;
+        }
+      }
+
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        name: data.name || `مستشفى ${docSnap.id}`,
+        beds: data.beds || { nicu: 0, picu: 0, icu: 0 },
+        lastUpdated: ((data.lastUpdated as Timestamp)?.toDate() || new Date()),
+      };
+      
+    } catch (error: any) {
+      console.error(`Error fetching hospital data for ${hId}:`, error);
+      // Check for permission denied error specifically
+      if (error.code === 'permission-denied') {
+          setError(`Permission denied. Please ensure you have the correct Firestore security rules deployed and are logged in with the correct account.`);
+      } else {
+          setError(`An error occurred while fetching hospital data: ${error.message}`);
+      }
+      return null;
+    }
+  }, [createDefaultHospitalDoc]);
+  
+  const updateHospitalBeds = useCallback(async (hId: string, updatedBeds: BedCounts): Promise<{ success: boolean; message?: string }> => {
+    if (!hId) {
+      return { success: false, message: 'Hospital ID is required.' };
+    }
+    try {
+      const hospitalRef = doc(db, 'hospitals', hId);
+      await updateDoc(hospitalRef, {
+        beds: updatedBeds,
+        lastUpdated: Timestamp.now(),
+      });
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error updating beds for hospital ${hId}:`, error);
+      return { success: false, message: `Failed to update bed counts: ${error.message}` };
+    }
+  }, []);
+
   useEffect(() => {
     if (!hospitalId) return;
 
@@ -63,15 +144,13 @@ export default function HospitalDashboardPage() {
       if (data) {
         setHospitalName(data.name);
         setBeds(data.beds);
-        setLastUpdated(new Date(data.lastUpdated));
-      } else {
-        setError(`لم يتم العثور على بيانات للمستشفى بالمعرف: ${hospitalId}. يرجى الاتصال بالمسؤول لإعداد حساب المستشفى الخاص بك في قاعدة البيانات.`);
-      }
+        setLastUpdated(data.lastUpdated);
+      } 
       setIsLoading(false);
     };
 
     fetchData();
-  }, [hospitalId]);
+  }, [hospitalId, getHospitalData]);
 
 
   const handleBedChange = (unit: keyof BedCounts, amount: number) => {
@@ -166,7 +245,7 @@ export default function HospitalDashboardPage() {
           <CardContent>
             <Alert variant="destructive">
               <Terminal className="h-4 w-4" />
-              <AlertTitle>بيانات المستشفى غير موجودة</AlertTitle>
+              <AlertTitle>حدث خطأ</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           </CardContent>
