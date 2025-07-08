@@ -8,12 +8,12 @@ import { getStorage } from "firebase/storage";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyARq7RSI7_wpk12ibkzHXofRGY9WuimsNk",
-  authDomain: "neobridge-7fb43.firebaseapp.com",
-  projectId: "neobridge-7fb43",
-  storageBucket: "neobridge-7fb43.appspot.com",
-  messagingSenderId: "33795675177",
-  appId: "1:33795675177:web:8677262b51a7c2a4c33838"
+  apiKey: "AIzaSyCPjJ3cHwTuIIMI8s07B1cYlouDsAWmS4c",
+  authDomain: "neobridge-w4lc9.firebaseapp.com",
+  projectId: "neobridge-w4lc9",
+  storageBucket: "neobridge-w4lc9.appspot.com",
+  messagingSenderId: "124550718816",
+  appId: "1:124550718816:web:11a06e76d59087a8a7ea05"
 };
 
 // Initialize Firebase
