@@ -1,16 +1,15 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow public read/write access to the 'cases' folder for file uploads
-    match /cases/{caseId}/{allPaths=**} {
-      allow read, write: if true;
+    // Allow public read on all files
+    match /{allPaths=**} {
+      allow read: if true;
     }
 
-    // Deny all other access
-    match /{allPaths=**} {
-      allow read, write: if false;
+    // Allow public write (upload) only to the 'cases' directory
+    match /cases/{caseId}/{fileName} {
+      allow write: if true;
     }
   }
 }
