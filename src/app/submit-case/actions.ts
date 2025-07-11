@@ -22,6 +22,9 @@ const FormSchema = z.object({
 
 
 async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
+  if (!adminStorage) {
+    throw new Error('Firebase Admin Storage is not initialized.');
+  }
   const bucket = adminStorage.bucket();
   const filePath = `cases/${caseId}/${type}-${file.name}`;
   const fileRef = bucket.file(filePath);
@@ -65,6 +68,10 @@ export async function submitCaseAction(formData: FormData): Promise<{ success: b
     console.error("Form validation failed", validatedData.error.flatten().fieldErrors);
     const firstError = Object.values(validatedData.error.flatten().fieldErrors)[0]?.[0] || "البيانات المدخلة غير صالحة.";
     return { success: false, error: firstError };
+  }
+  
+  if (!adminDb) {
+      return { success: false, error: "فشل الاتصال بقاعدة البيانات. يرجى المحاولة مرة أخرى لاحقًا." };
   }
 
   const { serviceType, medicalReport, identityDocument, ...caseData } = validatedData.data;
