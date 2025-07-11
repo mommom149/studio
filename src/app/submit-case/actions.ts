@@ -4,31 +4,41 @@
 import { detectServiceType } from '@/ai/flows/auto-detect-service-type';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-
+import { adminDb, adminStorage } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const FormSchema = z.object({
-  patientName: z.string(),
-  dob: z.string(), // Keep as string from FormData
-  contactPhone: z.string(),
+  patientName: z.string().min(1, 'Patient name is required.'),
+  dob: z.string().min(1, 'Date of birth is required.'),
+  contactPhone: z.string().min(1, 'Contact phone is required.'),
   otherContactPhone: z.string().optional(),
   contactEmail: z.string().email(),
-  referringHospital: z.string(),
+  referringHospital: z.string().min(1, 'Referring hospital is required.'),
   serviceType: z.string(),
   hasInsurance: z.preprocess((val) => val === 'true', z.boolean()),
-  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }).refine(file => file.size > 0, 'التقرير الطبي مطلوب.'),
-  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }).refine(file => file.size > 0, 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.'),
+  medicalReport: z.instanceof(File, { message: 'Medical report is required.' }).refine(file => file.size > 0, 'Medical report is required.'),
+  identityDocument: z.instanceof(File, { message: 'Identity document is required.' }).refine(file => file.size > 0, 'Identity document is required.'),
 });
 
+
 async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
-  const fileRef = ref(storage, `cases/${caseId}/${type}-${file.name}`);
-  // Pass metadata with contentType to fix upload issues
-  const snapshot = await uploadBytes(fileRef, file, { contentType: file.type });
-  const downloadURL = await getDownloadURL(snapshot.ref);
-  return downloadURL;
+  const bucket = adminStorage.bucket();
+  const filePath = `cases/${caseId}/${type}-${file.name}`;
+  const fileRef = bucket.file(filePath);
+
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+  await fileRef.save(fileBuffer, {
+    metadata: {
+      contentType: file.type,
+    },
+  });
+
+  // Make the file public and get the URL
+  await fileRef.makePublic();
+  return fileRef.publicUrl();
 }
+
 
 export async function getServiceTypeAction(ageInMonths: number) {
   try {
@@ -88,12 +98,12 @@ export async function submitCaseAction(formData: FormData): Promise<{ success: b
 
 
     // 2. Save case data to Cloud Firestore in the 'cases' collection
-    const caseRef = doc(db, 'cases', caseId);
-    await setDoc(caseRef, {
+    const caseRef = adminDb.collection('cases').doc(caseId);
+    await caseRef.set({
       ...caseData,
       id: caseId,
       status: 'Received',
-      submissionDate: serverTimestamp(),
+      submissionDate: FieldValue.serverTimestamp(),
       serviceType: serviceType,
       medicalReportUrl,
       identityDocumentUrl,
