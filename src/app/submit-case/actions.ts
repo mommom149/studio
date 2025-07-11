@@ -24,7 +24,8 @@ const FormSchema = z.object({
 
 async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
   const fileRef = ref(storage, `cases/${caseId}/${type}-${file.name}`);
-  const snapshot = await uploadBytes(fileRef, file);
+  // Pass metadata with contentType to fix upload issues
+  const snapshot = await uploadBytes(fileRef, file, { contentType: file.type });
   const downloadURL = await getDownloadURL(snapshot.ref);
   return downloadURL;
 }
@@ -65,11 +66,26 @@ export async function submitCaseAction(formData: FormData): Promise<{ success: b
   const randomNumber = Math.floor(1000 + Math.random() * 9000);
 
   const caseId = `${serviceType.toUpperCase()}-${dateString}-${randomNumber}`;
+  
+  let medicalReportUrl = '';
+  let identityDocumentUrl = '';
 
   try {
-    // 1. Upload files to Firebase Storage
-    const medicalReportUrl = await uploadFile(medicalReport, caseId, 'medical-report');
-    const identityDocumentUrl = await uploadFile(identityDocument, caseId, 'identity-document');
+    // 1. Upload files to Firebase Storage with proper error handling
+    try {
+        medicalReportUrl = await uploadFile(medicalReport, caseId, 'medical-report');
+    } catch (error) {
+        console.error("Medical report upload failed:", error);
+        return { success: false, error: "فشل تحميل التقرير الطبي. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى." };
+    }
+
+    try {
+        identityDocumentUrl = await uploadFile(identityDocument, caseId, 'identity-document');
+    } catch (error) {
+        console.error("Identity document upload failed:", error);
+        return { success: false, error: "فشل تحميل وثيقة الهوية. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى." };
+    }
+
 
     // 2. Save case data to Cloud Firestore in the 'cases' collection
     const caseRef = doc(db, 'cases', caseId);
@@ -90,8 +106,6 @@ export async function submitCaseAction(formData: FormData): Promise<{ success: b
     let errorMessage = "فشل إرسال الحالة. يرجى المحاولة مرة أخرى لاحقًا.";
     if (error.code?.includes('permission-denied')) {
         errorMessage = "فشل الإرسال بسبب مشكلة في الأذونات. يرجى الاتصال بالدعم الفني.";
-    } else if (error.code?.includes('storage')) {
-        errorMessage = "فشل تحميل الملفات. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.";
     }
     return { success: false, error: errorMessage };
   }
@@ -99,5 +113,3 @@ export async function submitCaseAction(formData: FormData): Promise<{ success: b
   // This will only be reached if the try block succeeds.
   redirect(`/submit-case/success?caseId=${caseId}`);
 }
-
-    
