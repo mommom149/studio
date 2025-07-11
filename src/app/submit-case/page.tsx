@@ -16,12 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Stethoscope, CalendarIcon, Loader2, Upload, Sparkles } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { Calendar } from '@/components/ui/calendar';
-import { ar } from 'date-fns/locale';
+import { Stethoscope, Loader2, Upload, Sparkles } from 'lucide-react';
 import { getServiceTypeAction, submitCaseAction } from './actions';
 import { useState, useTransition } from 'react';
 import type { DetectServiceTypeOutput } from '@/ai/flows/auto-detect-service-type';
@@ -41,14 +36,14 @@ import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   patientName: z.string().min(2, { message: 'الاسم مطلوب.' }),
-  dob: z.date({ required_error: 'تاريخ الميلاد مطلوب.' }),
+  dob: z.string().min(1, { message: 'تاريخ الميلاد مطلوب.' }),
   contactPhone: z.string().min(8, { message: 'رقم هاتف صحيح مطلوب.' }),
   otherContactPhone: z.string().optional(),
   contactEmail: z.string().email({ message: 'بريد إلكتروني صحيح مطلوب.' }),
   referringHospital: z.string().min(3, { message: 'اسم المستشفى أو الطبيب مطلوب.' }),
   hasInsurance: z.boolean().default(false),
-  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }),
-  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }),
+  medicalReport: z.instanceof(File, { message: 'التقرير الطبي مطلوب.' }).refine(file => file.size > 0, 'التقرير الطبي مطلوب.'),
+  identityDocument: z.instanceof(File, { message: 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.' }).refine(file => file.size > 0, 'شهادة الميلاد أو البطاقة الشخصية مطلوبة.'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,6 +61,7 @@ export default function SubmitCasePage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       patientName: '',
+      dob: '',
       contactPhone: '',
       otherContactPhone: '',
       contactEmail: '',
@@ -80,14 +76,22 @@ export default function SubmitCasePage() {
     }
   };
 
-  const handleDobChange = (date: Date | undefined) => {
-    form.setValue('dob', date as Date, { shouldValidate: true });
-
-    if (!date) {
+  const handleDobChange = (dateString: string) => {
+    form.setValue('dob', dateString, { shouldValidate: true });
+    
+    if (!dateString) {
       setAge(null);
       setServiceTypeInfo(null);
       return;
     }
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      setAge(null);
+      setServiceTypeInfo(null);
+      return;
+    }
+
 
     // --- Age calculation for display ---
     const now = new Date();
@@ -150,9 +154,7 @@ export default function SubmitCasePage() {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          if (value instanceof Date) {
-            formData.append(key, value.toISOString());
-          } else if (value instanceof File) {
+           if (value instanceof File) {
             formData.append(key, value);
           } else {
             // This will handle string and boolean correctly by converting to string.
@@ -243,34 +245,16 @@ export default function SubmitCasePage() {
                     control={form.control}
                     name="dob"
                     render={({ field }) => (
-                      <FormItem className="flex flex-col">
+                      <FormItem>
                         <FormLabel>تاريخ الميلاد</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant={'outline'}
-                                className={cn(
-                                  'w-full justify-start text-right font-normal',
-                                  !field.value && 'text-muted-foreground'
-                                )}
-                              >
-                                <CalendarIcon className="ms-auto me-2 h-4 w-4" />
-                                {field.value ? format(field.value, 'PPP', { locale: ar }) : <span>اختر تاريخًا</span>}
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={handleDobChange}
-                              disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                              initialFocus
-                              locale={ar}
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            onChange={(e) => handleDobChange(e.target.value)}
+                            max={new Date().toISOString().split("T")[0]} // Disable future dates
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -445,5 +429,3 @@ export default function SubmitCasePage() {
     </>
   );
 }
-
-    

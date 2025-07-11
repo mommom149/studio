@@ -3,11 +3,14 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     // Allow unauthenticated users to upload files to the 'cases' directory.
-    // This is necessary for the public case submission form.
-    // The path `cases/{caseId}/{allPaths=**}` allows writing to any file
-    // within a specific case's folder.
+    // This is for the public case submission form.
+    // We restrict file size and content type for security.
     match /cases/{caseId}/{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.resource.size < 5 * 1024 * 1024
+                       && (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('application/pdf'));
     }
+    
+    // For all other paths, deny access by default unless specific rules are added.
+    // Example: allow read, write: if request.auth != null;
   }
 }
