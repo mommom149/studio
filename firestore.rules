@@ -4,19 +4,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Allow anyone to submit a new case.
-    // In a real app, you would add validation here.
-    match /cases/{caseId} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null && request.auth.uid != null;
-    }
-    
-    // Allow hospital users to read and update their own document.
+    // Allow public read access to hospitals for the admin dashboard
     match /hospitals/{hospitalId} {
-       allow read, write: if request.auth != null && request.auth.token.email.split('@')[0] == hospitalId;
+      allow read: if true;
+      // Allow only authenticated hospital users to update their own document
+      allow write: if request.auth != null && request.auth.uid == hospitalId;
     }
 
-    // Default deny all other reads/writes
+    // Allow admins to read/write all cases
+    // Allow unauthenticated users to CREATE cases, but not read/update/delete
+    match /cases/{caseId} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'admin@neobridge.com';
+      allow create: if request.auth == null;
+    }
+
+    // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;
     }
