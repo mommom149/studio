@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   patientName: z.string().min(2, { message: 'الاسم مطلوب.' }),
@@ -59,6 +60,7 @@ export default function SubmitCasePage() {
   const [age, setAge] = useState<string | null>(null);
   const [isConsentDialogOpen, setIsConsentDialogOpen] = useState(true);
   const [isConsentAgreed, setIsConsentAgreed] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -161,11 +163,24 @@ export default function SubmitCasePage() {
       if (serviceTypeInfo?.serviceType) {
         formData.append('serviceType', serviceTypeInfo.serviceType);
       } else {
-        // Handle case where AI detection hasn't completed or failed.
-        // For now, we'll just prevent submission. A better UX would show an error.
+        toast({
+          variant: 'destructive',
+          title: 'خطأ في نوع الخدمة',
+          description: 'لم يتم تحديد نوع الخدمة تلقائيًا. يرجى التحقق من تاريخ الميلاد.',
+        });
         return;
       }
-      await submitCaseAction(formData);
+      
+      const result = await submitCaseAction(formData);
+
+      if (!result.success) {
+        toast({
+            variant: 'destructive',
+            title: 'فشل إرسال الحالة',
+            description: result.error || 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+        });
+      }
+      // Redirect is handled by the server action on success
     });
   }
 
@@ -431,3 +446,4 @@ export default function SubmitCasePage() {
   );
 }
 
+    

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { detectServiceType } from '@/ai/flows/auto-detect-service-type';
@@ -45,13 +46,14 @@ export async function getServiceTypeAction(ageInMonths: number) {
   }
 }
 
-export async function submitCaseAction(formData: FormData) {
+export async function submitCaseAction(formData: FormData): Promise<{ success: boolean; error?: string; }> {
   const rawFormData = Object.fromEntries(formData.entries());
   
   const validatedData = FormSchema.safeParse(rawFormData);
   if (!validatedData.success) {
     console.error("Form validation failed", validatedData.error.flatten().fieldErrors);
-    throw new Error("Invalid form data. Please check the fields and try again.");
+    const firstError = Object.values(validatedData.error.flatten().fieldErrors)[0]?.[0] || "البيانات المدخلة غير صالحة.";
+    return { success: false, error: firstError };
   }
 
   const { serviceType, medicalReport, identityDocument, ...caseData } = validatedData.data;
@@ -83,11 +85,19 @@ export async function submitCaseAction(formData: FormData) {
 
     console.log('Case submitted successfully to Firebase:', caseId);
   
-    redirect(`/submit-case/success?caseId=${caseId}`);
-
-  } catch (error) {
+  } catch (error: any) {
     console.error("Firebase submission failed:", error);
-    // In a real app, you might want to redirect to an error page or show a toast
-    throw new Error("Failed to submit the case. Please try again later.");
+    let errorMessage = "فشل إرسال الحالة. يرجى المحاولة مرة أخرى لاحقًا.";
+    if (error.code?.includes('permission-denied')) {
+        errorMessage = "فشل الإرسال بسبب مشكلة في الأذونات. يرجى الاتصال بالدعم الفني.";
+    } else if (error.code?.includes('storage')) {
+        errorMessage = "فشل تحميل الملفات. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.";
+    }
+    return { success: false, error: errorMessage };
   }
+
+  // This will only be reached if the try block succeeds.
+  redirect(`/submit-case/success?caseId=${caseId}`);
 }
+
+    
