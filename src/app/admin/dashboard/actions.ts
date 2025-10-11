@@ -1,7 +1,8 @@
 'use server';
 
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { Timestamp, doc, updateDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from "firebase/auth";
 
 // Shape of case data sent to the client (serializable)
 export interface CaseForClient {
@@ -57,12 +58,19 @@ export async function updateCase(caseId: string, updates: { status?: CaseForClie
 export async function assignCaseToHospital(
   caseId: string, 
   hospitalName: string,
-  adminUser: string = 'admin@neobridge.com' // Placeholder until we have auth
+  adminUser: string = 'admin@neobridge.com'
 ): Promise<{ success: boolean; message?: string }> {
-   if (!caseId || !hospitalName) {
+  if (!caseId || !hospitalName) {
     return { success: false, message: 'Case ID and hospital name are required.' };
   }
+
   try {
+    // const user = auth.currentUser;
+    // console.log('user::', user);
+    // if (!user) {
+    //   return { success: false, message: "No authenticated user found." };
+    // }
+
     const caseRef = doc(db, 'cases', caseId);
     await updateDoc(caseRef, {
       status: 'Assigned',
@@ -71,8 +79,12 @@ export async function assignCaseToHospital(
       assignedAt: Timestamp.now(),
     });
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error assigning case ${caseId} to hospital:`, error);
-    return { success: false, message: 'Failed to assign case.' };
+
+    return { 
+      success: false, 
+      message: error.message ?? 'Failed to assign case.' 
+    };
   }
 }

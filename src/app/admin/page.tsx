@@ -24,8 +24,9 @@ export default function AdminAccessPage() {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      console.log("Logged in as:", userCred.user.email);
+
       toast({
         title: 'تم تسجيل الدخول بنجاح',
         description: 'جاري إعادة توجيهك إلى لوحة التحكم.',

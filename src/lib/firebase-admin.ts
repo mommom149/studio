@@ -1,40 +1,38 @@
-import admin from 'firebase-admin';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCPjJ3cHwTuIIMI8s07B1cYlouDsAWmS4c",
-  authDomain: "neobridge-w4lc9.firebaseapp.com",
-  projectId: "neobridge-w4lc9",
-  storageBucket: "neobridge-w4lc9.appspot.com",
-  messagingSenderId: "124550718816",
-  appId: "1:124550718816:web:11a06e76d59087a8a7ea05"
-};
+import admin from "firebase-admin";
+import { getApps, initializeApp, cert } from "firebase-admin/app";
 
 const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-// Check if we're on the server and have the service account key
+console.log("ENV:", process.env.FIREBASE_SERVICE_ACCOUNT_KEY ? "Loaded" : "Missing");
+
+
 if (serviceAccountKey && !getApps().length) {
+    const parsedKey = JSON.parse(serviceAccountKey);
+
+    // fix private_key newlines
+    parsedKey.private_key = parsedKey.private_key.replace(/\\n/g, "\n");
   try {
     initializeApp({
-      credential: cert(JSON.parse(serviceAccountKey)),
-      storageBucket: firebaseConfig.storageBucket,
+      credential: cert(parsedKey),
+      // storageBucket: "neobridge-w4lc9.appspot.com",
     });
-    console.log("Firebase Admin SDK initialized successfully.");
+    console.log("✅ Firebase Admin SDK initialized successfully.");
   } catch (e: any) {
-    console.error("Firebase Admin SDK initialization error:", e.message);
+    console.error("❌ Firebase Admin SDK initialization error:", e.message);
   }
 }
 
-// Ensure we don't export non-initialized services, which would cause runtime errors.
-// If initialization failed, these will throw an error upon access.
+// Services
 const adminDb = getApps().length > 0 ? admin.firestore() : null;
 const adminAuth = getApps().length > 0 ? admin.auth() : null;
 const adminStorage = getApps().length > 0 ? admin.storage() : null;
 
-// Throw a clear error if the services are not available when they are imported.
-if (typeof window === 'undefined' && (!adminDb || !adminAuth || !adminStorage)) {
+// Guard for server-side only
+if (typeof window === "undefined" && (!adminDb || !adminAuth || !adminStorage)) {
   if (!serviceAccountKey) {
-     console.error("FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase Admin SDK could not be initialized.");
+    console.error(
+      "❌ FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase Admin SDK could not be initialized."
+    );
   }
 }
 

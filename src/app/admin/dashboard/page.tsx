@@ -386,7 +386,7 @@ export default function AdminDashboardPage() {
                                                   <SelectValue placeholder={isLoadingHospitals ? "جاري تحميل المستشفيات..." : "اختر مستشفى..."}/>
                                               </SelectTrigger>
                                               <SelectContent>
-                                                  {hospitals.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                                                  {hospitals.map(h => <SelectItem key={h.id} value={String(h.id)}>{h.name}</SelectItem>)}
                                               </SelectContent>
                                           </Select>
                                       </div>

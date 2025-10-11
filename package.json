@@ -9,9 +9,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "serve": "firebase emulators:start"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/cli": "^7.4.2",
+    "@capacitor/core": "^7.4.2",
     "@genkit-ai/googleai": "^1.8.0",
     "@genkit-ai/next": "^1.8.0",
     "@hookform/resolvers": "^3.9.0",
@@ -39,15 +43,17 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "firebase": "^10.12.3",
     "firebase-admin": "^12.2.0",
     "framer-motion": "^11.3.8",
     "genkit": "^1.8.0",
     "lucide-react": "^0.475.0",
+    "multer": "^2.0.2",
     "next": "^15.0.0",
     "patch-package": "^8.0.0",
-    "react": "^19.0.0-rc",
-    "react-dom": "^19.0.0-rc",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "react-hook-form": "^7.52.1",
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
@@ -55,12 +61,31 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^20.19.11",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
     "genkit-cli": "^1.8.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  }
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "description": "This is a NextJS starter in Firebase Studio.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ali-khaled-elsayed/studio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ali-khaled-elsayed/studio/issues"
+  },
+  "homepage": "https://github.com/ali-khaled-elsayed/studio#readme"
 }

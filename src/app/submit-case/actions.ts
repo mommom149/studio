@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { adminDb, adminStorage } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { uploadFile } from "../../lib/upload-file";
+
 
 const FormSchema = z.object({
   patientName: z.string().min(1, 'Patient name is required.'),
@@ -21,26 +23,26 @@ const FormSchema = z.object({
 });
 
 
-async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
-  if (!adminStorage) {
-    throw new Error('Firebase Admin Storage is not initialized.');
-  }
-  const bucket = adminStorage.bucket();
-  const filePath = `cases/${caseId}/${type}-${file.name}`;
-  const fileRef = bucket.file(filePath);
+// async function uploadFile(file: File, caseId: string, type: string): Promise<string> {
+//   if (!adminStorage) {
+//     throw new Error('Firebase Admin Storage is not initialized.');
+//   }
+//   const bucket = adminStorage.bucket();
+//   const filePath = `cases/${caseId}/${type}-${file.name}`;
+//   const fileRef = bucket.file(filePath);
 
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
+//   const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-  await fileRef.save(fileBuffer, {
-    metadata: {
-      contentType: file.type,
-    },
-  });
+//   await fileRef.save(fileBuffer, {
+//     metadata: {
+//       contentType: file.type,
+//     },
+//   });
 
-  // Make the file public and get the URL
-  await fileRef.makePublic();
-  return fileRef.publicUrl();
-}
+//   // Make the file public and get the URL
+//   await fileRef.makePublic();
+//   return fileRef.publicUrl();
+// }
 
 
 export async function getServiceTypeAction(ageInMonths: number) {
